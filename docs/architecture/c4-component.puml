@@ -1,0 +1,46 @@
+@startuml C4_Component
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title SerpentRAG API Server - Component Diagram
+
+Container_Boundary(api_server, "API Server (FastAPI + Uvicorn)") {
+
+    Component(middleware, "Middleware", "Starlette", "Request logging (structlog), OpenTelemetry + Prometheus telemetry, multi-tenant isolation")
+
+    Component(api_layer, "API Layer", "FastAPI Routers", "9 routers: /query, /query/stream, /compare, /documents, /collections, /strategies, /traces, /graph, /metrics, /advisor, /health")
+
+    Component(strategy_layer, "Strategy Layer", "Python classes + Factory", "NaiveRAG, HybridRAG (BM25 + dense + ColBERT reranker), GraphRAG (Neo4j traversal), AgenticRAG (multi-hop tool use), MemoRAG (dual-system memory), CorrectiveRAG (self-grading + web fallback)")
+
+    Component(service_layer, "Service Layer", "Python async services", "EmbeddingService (BGE-M3 local / OpenAI), LLMService (LiteLLM), QdrantService, Neo4jService, RedisService, TracingService, DocumentProcessor, EvaluationService (RAGAS)")
+
+    Component(schemas, "Schemas", "Pydantic v2", "Request/response validation: QueryRequest, DocumentSchema, TraceSchema, CompareRequest, StrategyInfo")
+
+    Component(models, "Data Layer", "SQLAlchemy 2.0 async", "Document, Chunk, Collection, QueryLog, PipelineTrace, Tenant (UUIDMixin + TimestampMixin)")
+}
+
+Container_Boundary(worker_boundary, "Celery Worker") {
+    Component(worker_tasks, "Ingest Pipeline", "Celery tasks", "parse (unstructured PDF/DOCX) -> chunk (langchain splitter) -> embed (BGE-M3) -> store (Qdrant + PostgreSQL)")
+}
+
+ContainerDb(postgres, "PostgreSQL", "pgvector")
+ContainerDb(redis, "Redis", "Cache + Broker")
+ContainerDb(qdrant, "Qdrant", "Vector Store")
+ContainerDb(neo4j, "Neo4j", "Graph Store")
+System_Ext(llm, "LLM Providers", "OpenAI / Anthropic / Ollama")
+
+Rel(middleware, api_layer, "Passes through")
+Rel(api_layer, strategy_layer, "Delegates queries via StrategyFactory")
+Rel(api_layer, service_layer, "Direct calls (documents, traces, metrics)")
+Rel(api_layer, schemas, "Validates request/response")
+Rel(strategy_layer, service_layer, "Uses embedding, LLM, vector, graph, cache")
+Rel(service_layer, models, "ORM operations")
+Rel(service_layer, postgres, "Async queries", "asyncpg")
+Rel(service_layer, redis, "Cache ops", "aioredis")
+Rel(service_layer, qdrant, "Vector search", "qdrant-client")
+Rel(service_layer, neo4j, "Graph queries", "neo4j-driver")
+Rel(service_layer, llm, "LLM completions", "LiteLLM")
+Rel(worker_tasks, service_layer, "Reuses embedding + vector store services")
+
+@enduml

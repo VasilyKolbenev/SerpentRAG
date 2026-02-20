@@ -1,0 +1,68 @@
+# ── Python ─────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# ── Virtual Environments ──────────────────────
+.venv/
+venv/
+ENV/
+
+# ── Testing & Coverage ───────────────────────
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+coverage.xml
+
+# ── Node.js ───────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# ── Environment & Secrets ─────────────────────
+.env
+.env.txt
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ── IDE ───────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Docker ────────────────────────────────────
+docker-compose.override.yml
+
+# ── Uploads & Models (runtime data) ──────────
+uploads/
+models/
+*.h5
+*.pt
+*.bin
+*.onnx
+
+# ── Logs ──────────────────────────────────────
+*.log
+logs/
+
+# ── OS ────────────────────────────────────────
+nul
+
+# ── Misc ──────────────────────────────────────
+install-docker.sh

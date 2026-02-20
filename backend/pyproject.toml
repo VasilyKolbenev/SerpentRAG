@@ -1,0 +1,31 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "app/workers/*",
+    "app/middleware/*",
+    "app/main.py",
+    "app/models/document.py",
+    "app/models/query_log.py",
+    "app/models/trace.py",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__",
+    "pass",
+    "raise NotImplementedError",
+]

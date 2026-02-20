@@ -1,0 +1,25 @@
+@startuml C4_Context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+
+title SerpentRAG Platform - System Context Diagram
+
+Person(user, "User", "Researcher, analyst, or developer querying document collections via browser")
+Person(admin, "Admin", "Manages collections, monitors quality, configures strategies")
+
+System(serpentrag, "SerpentRAG Platform", "Self-hosted RAG platform with 6 retrieval strategies: Naive, Hybrid, Graph, Agentic, MemoRAG, Corrective RAG")
+
+System_Ext(openai, "OpenAI API", "GPT-4o for generation, text-embedding-ada-002 for embeddings")
+System_Ext(anthropic, "Anthropic API", "Claude 3 Haiku (Advisor, MemoRAG light model)")
+System_Ext(ollama, "Ollama", "Local LLM inference (optional, air-gapped deployments)")
+System_Ext(websearch, "Tavily / SerpAPI", "Web search fallback for Corrective RAG (optional)")
+
+Rel(user, serpentrag, "Queries documents, uploads files, compares strategies", "HTTPS")
+Rel(admin, serpentrag, "Manages collections, views traces, monitors quality", "HTTPS")
+Rel(serpentrag, openai, "LLM completions, embeddings", "HTTPS / API Key")
+Rel(serpentrag, anthropic, "LLM completions (Advisor, MemoRAG)", "HTTPS / API Key")
+Rel(serpentrag, ollama, "Local LLM inference", "HTTP")
+Rel(serpentrag, websearch, "Web search fallback (CRAG)", "HTTPS / API Key")
+
+@enduml

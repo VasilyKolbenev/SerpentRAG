@@ -1,0 +1,39 @@
+@startuml C4_Container
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title SerpentRAG Platform - Container Diagram
+
+Person(user, "User", "Browser-based interaction")
+
+System_Boundary(serpent, "SerpentRAG Platform") {
+    Container(frontend, "Frontend", "React 18, TypeScript, Tailwind CSS, Nginx", "SPA: Chat, RAG Debugger, A/B Compare, Graph Explorer, Quality Dashboard, AI Advisor")
+    Container(api, "API Server", "FastAPI, Uvicorn, Python 3.12", "REST API + SSE streaming, 6 RAG strategies, JWT auth, pipeline tracing")
+    Container(worker, "Celery Worker", "Celery 5.4, Python 3.12", "Async document processing: parse -> chunk -> embed -> store")
+
+    ContainerDb(postgres, "PostgreSQL 16", "pgvector extension", "Documents, chunks, collections, query logs, pipeline traces, tenants")
+    ContainerDb(redis, "Redis 7", "Alpine", "LLM response cache, MemoRAG memory (24h TTL), Celery broker, Advisor sessions")
+    ContainerDb(qdrant, "Qdrant", "v1.11", "Vector store: dense embeddings (BGE-M3, 1024-dim), collections per tenant")
+    ContainerDb(neo4j, "Neo4j", "5.22 Community", "Knowledge graph: entities + relationships for Graph RAG (optional)")
+}
+
+System_Ext(llm, "LLM Providers", "OpenAI / Anthropic / Ollama via LiteLLM")
+System_Ext(monitoring, "Monitoring", "Prometheus + Grafana + OpenTelemetry (production)")
+
+Rel(user, frontend, "Browses UI", "HTTPS :3000")
+Rel(frontend, api, "API calls + SSE streaming", "HTTP /api/* :8000")
+
+Rel(api, postgres, "Async ORM queries", "asyncpg :5432")
+Rel(api, redis, "Cache + session store", "redis :6379")
+Rel(api, qdrant, "Vector similarity search", "HTTP/gRPC :6333")
+Rel(api, neo4j, "Cypher graph queries", "Bolt :7687")
+Rel(api, llm, "LLM completions via LiteLLM", "HTTPS")
+
+Rel(worker, redis, "Task queue (broker + results)", "redis :6379")
+Rel(worker, postgres, "Store processed chunks", "asyncpg :5432")
+Rel(worker, qdrant, "Store embeddings", "HTTP :6333")
+
+Rel_L(api, monitoring, "Metrics + traces", "OTLP / Prometheus")
+
+@enduml
