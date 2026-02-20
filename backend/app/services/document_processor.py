@@ -4,6 +4,7 @@ Document processing service — parse, chunk, embed, store.
 
 import logging
 import os
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -65,7 +66,7 @@ class DocumentProcessorService:
         ids = []
         payloads = []
         for i, (chunk, _emb) in enumerate(zip(chunks, embeddings)):
-            chunk_id = f"{document_id}_{i}"
+            chunk_id = str(uuid.uuid5(uuid.UUID(document_id), str(i)))
             ids.append(chunk_id)
             payloads.append({
                 "content": chunk,

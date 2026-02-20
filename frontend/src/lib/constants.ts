@@ -240,14 +240,14 @@ export const PIPELINE_CONFIGS: Record<RAGStrategy, PipelineConfigItem[]> = {
     { label: 'Relation Scoring', value: true, type: 'toggle' },
   ],
   hybrid: [
-    { label: 'Dense Model', value: 'BGE-M3', type: 'select' },
+    { label: 'Dense Model', value: 'MiniLM-L6-v2', type: 'select' },
     { label: 'Sparse Weight', value: '0.3', type: 'number' },
     { label: 'Re-ranker', value: 'Cross-Encoder', type: 'select' },
     { label: 'RRF Enabled', value: true, type: 'toggle' },
     { label: 'Chunk Overlap', value: '128', type: 'number' },
   ],
   naive: [
-    { label: 'Embedding Model', value: 'BGE-M3', type: 'select' },
+    { label: 'Embedding Model', value: 'MiniLM-L6-v2', type: 'select' },
     { label: 'Top-K', value: '10', type: 'number' },
     { label: 'Chunk Size', value: '512', type: 'number' },
     { label: 'Sim Threshold', value: '0.5', type: 'number' },

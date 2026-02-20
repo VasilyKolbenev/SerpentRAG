@@ -60,14 +60,20 @@ class QdrantService:
         existing = {c.name for c in collections.collections}
 
         if collection_name not in existing:
-            await self._client.create_collection(
-                collection_name=collection_name,
-                vectors_config=VectorParams(
-                    size=dimensions,
-                    distance=Distance.COSINE,
-                ),
-            )
-            logger.info("Created Qdrant collection", extra={"name": collection_name})
+            try:
+                await self._client.create_collection(
+                    collection_name=collection_name,
+                    vectors_config=VectorParams(
+                        size=dimensions,
+                        distance=Distance.COSINE,
+                    ),
+                )
+                logger.info("Created Qdrant collection", extra={"collection": collection_name})
+            except Exception as exc:
+                if "already exists" in str(exc):
+                    logger.debug("Collection already exists (race condition)", extra={"collection": collection_name})
+                else:
+                    raise
 
     async def upsert(
         self,

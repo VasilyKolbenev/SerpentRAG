@@ -106,6 +106,9 @@ export function useStreamQuery(): UseStreamQueryReturn {
 
           buffer += decoder.decode(value, { stream: true });
 
+          // Normalize \r\n to \n (sse-starlette sends \r\n line endings)
+          buffer = buffer.replace(/\r\n/g, '\n');
+
           // Process complete SSE messages (separated by \n\n)
           const parts = buffer.split('\n\n');
           // Keep last (possibly incomplete) part in buffer
@@ -147,9 +150,13 @@ function processSSEBuffer(
   buffer: string,
   setState: React.Dispatch<React.SetStateAction<StreamState>>,
 ) {
-  const lines = buffer.split('\n');
-  for (const line of lines) {
-    processSSELine(line, setState);
+  // Buffer may contain multiple SSE messages — split and process each
+  const normalized = buffer.replace(/\r\n/g, '\n');
+  const parts = normalized.split('\n\n');
+  for (const part of parts) {
+    if (part.trim()) {
+      processSSEMessage(part, setState);
+    }
   }
 }
 
@@ -157,23 +164,27 @@ function processSSEMessage(
   message: string,
   setState: React.Dispatch<React.SetStateAction<StreamState>>,
 ) {
+  // Standard SSE format: "event: <type>\ndata: <json>\n\n"
   const lines = message.split('\n');
-  for (const line of lines) {
-    processSSELine(line, setState);
-  }
-}
+  let eventType = '';
+  let dataStr = '';
 
-function processSSELine(
-  line: string,
-  setState: React.Dispatch<React.SetStateAction<StreamState>>,
-) {
-  if (!line.startsWith('data: ')) return;
+  for (const line of lines) {
+    const trimmed = line.replace(/\r$/, '');
+    if (trimmed.startsWith('event: ')) {
+      eventType = trimmed.slice(7).trim();
+    } else if (trimmed.startsWith('data: ')) {
+      dataStr = trimmed.slice(6);
+    }
+  }
+
+  if (!dataStr) return;
 
   try {
-    const raw = line.slice(6);
-    const parsed = JSON.parse(raw);
-    const event = parsed.event as string;
-    const data = parsed.data ?? parsed;
+    const data = JSON.parse(dataStr);
+
+    // Fallback: if no event: line, try to get event from data.event
+    const event = eventType || (data.event as string) || '';
 
     switch (event) {
       case 'status':
@@ -183,17 +194,20 @@ function processSSELine(
         }));
         break;
 
-      case 'sources':
+      case 'sources': {
+        // Backend sends array directly, or {sources: [...]}
+        const sources = Array.isArray(data) ? data : (data.sources ?? []);
         setState((prev) => ({
           ...prev,
-          sources: data.sources as SourceInfo[],
+          sources: sources as SourceInfo[],
         }));
         break;
+      }
 
       case 'token':
         setState((prev) => ({
           ...prev,
-          tokens: prev.tokens + (data.text as string),
+          tokens: prev.tokens + ((data.text as string) ?? ''),
         }));
         break;
 
@@ -203,11 +217,19 @@ function processSSELine(
           phase: 'done',
           traceId: (data.trace_id as string) ?? null,
           latencyMs: (data.latency_ms as number) ?? null,
-          strategyUsed: (data.strategy_used as RAGStrategy) ?? null,
+          strategyUsed: (data.strategy as RAGStrategy) ?? (data.strategy_used as RAGStrategy) ?? null,
+        }));
+        break;
+
+      case 'error':
+        setState((prev) => ({
+          ...prev,
+          phase: 'error',
+          error: (data.message as string) ?? 'Unknown error',
         }));
         break;
     }
   } catch {
-    // Skip malformed SSE lines
+    // Skip malformed SSE data
   }
 }
