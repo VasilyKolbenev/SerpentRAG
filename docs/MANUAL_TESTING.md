@@ -7,62 +7,62 @@
 
 ## Pre-requisites
 
-- [ ] Docker stack running: `docker compose ps` — all 7 services up
-- [ ] API healthy: `curl http://localhost:8000/health` returns `"status": "healthy"`
-- [ ] Frontend loads: http://localhost:3000 shows SerpentRAG UI
-- [ ] API keys configured in `.env` (OPENAI_API_KEY and/or ANTHROPIC_API_KEY)
+- [x] Docker stack running: `docker compose ps` — all 7 services up
+- [x] API healthy: `curl http://localhost:8000/health` returns `"status": "healthy"`
+- [x] Frontend loads: http://localhost:3000 shows SerpentRAG UI
+- [x] API keys configured in `.env` (OPENAI_API_KEY and/or ANTHROPIC_API_KEY)
 
 ---
 
 ## 1. Strategies Page (`/strategies`)
 
 ### 1.1 Strategy Grid
-- [ ] All 6 strategy cards displayed (Simple, Hybrid, Graph, Agentic, MemoRAG, Corrective)
-- [ ] Each card shows: name, description, tags, complexity/latency/accuracy ratings
-- [ ] Click on strategy card — card visually highlights as selected
-- [ ] Selected strategy persists when navigating to Chat page
+- [x] All 6 strategy cards displayed (Simple, Hybrid, Graph, Agentic, MemoRAG, Corrective)
+- [x] Each card shows: name, description, tags, complexity/latency/accuracy ratings
+- [x] Click on strategy card — card visually highlights as selected
+- [x] Selected strategy persists when navigating to Chat page
 
 ### 1.2 Strategy Advisor (wizard)
-- [ ] Click "Strategy Advisor" toggle — advisor panel opens
-- [ ] Step 1: Select domain (7 options) — click one, advances to step 2
-- [ ] Step 2: Select query complexity (4 options)
-- [ ] Step 3: Select data structure (4 options)
-- [ ] Step 4: Select priority (4 options)
-- [ ] After step 4: recommendation appears with strategy name + percentage scores
-- [ ] Click recommended strategy — applies to selected strategy
-- [ ] Click "Start Over" — wizard resets to step 1
+- [x] Click "Strategy Advisor" toggle — advisor panel opens
+- [x] Step 1: Select domain (7 options) — click one, advances to step 2
+- [x] Step 2: Select query complexity (4 options)
+- [x] Step 3: Select data structure (4 options)
+- [x] Step 4: Select priority (4 options)
+- [x] After step 4: recommendation appears with strategy name + percentage scores
+- [x] Click recommended strategy — applies to selected strategy
+- [x] Click "Start Over" — wizard resets to step 1
 
 ### 1.3 Pipeline Architecture
-- [ ] 5-step pipeline visualization displayed (Ingest → Process → Index → Retrieve → Generate)
+- [x] 5-step pipeline visualization displayed (Ingest → Process → Index → Retrieve → Generate)
 
 ---
 
 ## 2. Chat Page (`/chat`)
 
 ### 2.1 Document Upload
-- [ ] Upload zone visible in sidebar
-- [ ] **Drag & drop** a PDF file — upload starts, status shows ⏳
-- [ ] **Click zone** to open file picker — select file, upload starts
-- [ ] File status changes: ⏳ uploading → ⚙️ processing → ✅ indexed
+- [x] Upload zone visible in sidebar
+- [x] **Drag & drop** a PDF file — upload starts, status shows ⏳
+- [x] **Click zone** to open file picker — select file, upload starts
+- [x] File status changes: ⏳ uploading → ⚙️ processing → ✅ indexed
 - [ ] Upload a DOCX file — same flow
-- [ ] Upload a TXT file — same flow
+- [x] Upload a TXT file — same flow
 - [ ] Upload invalid file (e.g., .exe) — rejected or error shown
 - [ ] Upload multiple files at once — all show in file list
 
 ### 2.2 Query (Streaming)
-- [ ] Type query in input box, press Enter
-- [ ] **Tokens stream** in real-time (word by word, not all at once)
+- [x] Type query in input box, press Enter
+- [x] **Tokens stream** in real-time (word by word, not all at once)
 - [ ] Streaming cursor visible during generation
-- [ ] After completion: full answer displayed with markdown formatting
-- [ ] **Source chips** appear below answer (filename + relevance score)
-- [ ] **Strategy badge** shows which strategy was used
-- [ ] **Latency** (ms) displayed
-- [ ] **"View trace →"** link appears — click opens Debugger page
+- [x] After completion: full answer displayed with markdown formatting
+- [x] **Source chips** appear below answer (filename + relevance score)
+- [x] **Strategy badge** shows which strategy was used
+- [x] **Latency** (ms) displayed
+- [x] **"View trace →"** link appears — click opens Debugger page
 
 ### 2.3 Strategy Selection
-- [ ] Current strategy shown as badge in chat input
-- [ ] Change strategy on Strategies page → badge updates on Chat page
-- [ ] Query uses the selected strategy (check strategy badge in response)
+- [x] Current strategy shown as badge in chat input
+- [x] Change strategy on Strategies page → badge updates on Chat page
+- [x] Query uses the selected strategy (check strategy badge in response)
 
 ### 2.4 Error Handling
 - [ ] Send query with no uploaded documents — appropriate message returned
@@ -189,14 +189,14 @@
 ## 8. Global / Cross-Page
 
 ### 8.1 Navigation
-- [ ] Header shows all nav links: Strategies, Chat, Debugger, Compare, Graph, Quality
-- [ ] Click each nav link — correct page loads
-- [ ] Active page highlighted in nav
+- [x] Header shows all nav links: Strategies, Chat, Debugger, Compare, Graph, Quality
+- [x] Click each nav link — correct page loads
+- [x] Active page highlighted in nav
 
 ### 8.2 Health Status
-- [ ] "System: nominal" indicator in header (green when healthy)
-- [ ] Stop API → indicator changes to "offline" / "degraded"
-- [ ] Restart API → indicator recovers to "nominal"
+- [x] "System: nominal" indicator in header (green when healthy)
+- [x] Stop API → indicator changes to "offline" / "degraded"
+- [x] Restart API → indicator recovers to "nominal"
 
 ### 8.3 Responsive
 - [ ] Resize browser window — layout adapts (no horizontal scroll)
@@ -208,12 +208,12 @@
 
 **The complete user journey:**
 
-1. [ ] Open http://localhost:3000 → Strategies page loads
-2. [ ] Select "Hybrid" strategy
-3. [ ] Navigate to Chat page
-4. [ ] Upload a PDF document → wait for "indexed" status ✅
-5. [ ] Type query about the document → tokens stream in real-time
-6. [ ] Answer appears with sources and trace link
+1. [x] Open http://localhost:3000 → Strategies page loads
+2. [x] Select "Hybrid" strategy
+3. [x] Navigate to Chat page
+4. [x] Upload a PDF document → wait for "indexed" status ✅
+5. [x] Type query about the document → tokens stream in real-time
+6. [x] Answer appears with sources and trace link
 7. [ ] Click "View trace →" → Debugger shows pipeline steps
 8. [ ] Go to Compare page → select Naive + Hybrid + Graph
 9. [ ] Run same query → see 3 results side-by-side
@@ -223,7 +223,26 @@
 
 ---
 
-## 10. Bug Report Template
+## 10. Bugs Found & Fixed (Phase 8)
+
+| # | Bug | Root Cause | Fix | Commit |
+|---|-----|-----------|-----|--------|
+| 1 | Docker daemon restarting every ~3 min | WSL2 `systemctl poweroff` (vmIdleTimeout) | `.wslconfig` with `vmIdleTimeout=-1` | `ccf6d03` |
+| 2 | Qdrant 400: invalid point ID | `f"{doc_id}_{i}"` not valid UUID/uint | `uuid.uuid5()` in `document_processor.py` | `ccf6d03` |
+| 3 | Vector dimension mismatch (1024 vs 384) | Worker missing `EMBEDDING_DIMENSIONS` env | Added `EMBEDDING_DIMENSIONS=384` to worker in `docker-compose.yml` | `ccf6d03` |
+| 4 | LogRecord `name` key conflict | `extra={"name": ...}` overwrites built-in | Changed to `extra={"collection": ...}` in `vector_store.py` | `ccf6d03` |
+| 5 | Collection creation race condition | Two workers create same collection simultaneously | try/except "already exists" in `vector_store.py` | `ccf6d03` |
+| 6 | nginx 502 after API restart | Stale DNS cache (IP from startup) | `resolver 127.0.0.11 valid=10s` + variable `proxy_pass` | `ccf6d03` |
+| 7 | nginx blocks file uploads >1MB | Default `client_max_body_size 1m` | Added `client_max_body_size 50m` in `nginx.conf` | `ccf6d03` |
+| 8 | SSE tokens not displayed | Frontend expected nested JSON, backend sends standard SSE | Rewrote `processSSEMessage` for `event:`/`data:` format | `ccf6d03` |
+| 9 | SSE buffer never splits | `\r\n\r\n` ≠ `\n\n` (sse-starlette sends `\r\n`) | `buffer.replace(/\r\n/g, '\n')` before split | `ccf6d03` |
+| 10 | Pipeline Config shows "BGE-M3" | Hardcoded in `constants.ts` | Changed to "MiniLM-L6-v2" | `ccf6d03` |
+| 11 | Dockerfile HEALTHCHECK restart loop | Docker Compose v5 ignores `start_period` | Removed HEALTHCHECK from Dockerfile | `ccf6d03` |
+| 12 | Embedding model too slow (BGE-M3, 5+ min) | 1.7GB model on CPU | Switched to all-MiniLM-L6-v2 (80MB, ~3s load) | `ccf6d03` |
+
+---
+
+## 11. Bug Report Template
 
 When finding issues, record:
 
