@@ -20,6 +20,7 @@ const INITIAL_STATE: StreamState = {
   traceId: null,
   latencyMs: null,
   strategyUsed: null,
+  sessionId: null,
   error: null,
 };
 
@@ -218,6 +219,7 @@ function processSSEMessage(
           traceId: (data.trace_id as string) ?? null,
           latencyMs: (data.latency_ms as number) ?? null,
           strategyUsed: (data.strategy as RAGStrategy) ?? (data.strategy_used as RAGStrategy) ?? null,
+          sessionId: (data.session_id as string) ?? null,
         }));
         break;
 

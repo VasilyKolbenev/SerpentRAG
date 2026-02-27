@@ -4,12 +4,15 @@ Main RAG query endpoints — sync and streaming.
 
 import asyncio
 import json
+import logging
 import time
 import uuid
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Header, Request
 from sse_starlette.sse import EventSourceResponse
+from typing import Optional
 
+from app.dependencies import get_current_user
 from app.schemas.query import (
     CompareRequest,
     CompareResponse,
@@ -19,15 +22,55 @@ from app.schemas.query import (
     SourceInfo,
 )
 
+logger = logging.getLogger("serpent.query")
+
 router = APIRouter(tags=["query"])
+
+MAX_HISTORY_MESSAGES = 20  # 10 turns
+
+
+async def _load_session(app, user_id: str, session_id: Optional[str]):
+    """Load chat session from Redis, return (session_id, history)."""
+    cache = app.state.cache
+    sid = session_id or str(uuid.uuid4())
+    history = await cache.get_chat_session(user_id, sid) or []
+    return sid, history
+
+
+async def _save_session(app, user_id: str, session_id: str, history: list[dict]):
+    """Save chat session to Redis with message limit."""
+    cache = app.state.cache
+    trimmed = history[-MAX_HISTORY_MESSAGES:]
+    await cache.set_chat_session(user_id, session_id, trimmed)
+
+
+def _get_user_id(current_user: Optional[dict]) -> str:
+    """Extract user_id from JWT payload or fallback to anonymous."""
+    if current_user and current_user.get("sub"):
+        return current_user["sub"]
+    return "anonymous"
 
 
 @router.post("/query", response_model=QueryResponse)
-async def query_documents(request: QueryRequest, req: Request):
+async def query_documents(
+    request: QueryRequest,
+    req: Request,
+    current_user: Optional[dict] = Depends(get_current_user),
+):
     """Main RAG query endpoint — retrieves context and generates answer."""
     app = req.app
     factory = app.state.strategy_factory
     tracing = app.state.tracing_service
+    llm_service = app.state.llm_service
+
+    # Session management
+    user_id = _get_user_id(current_user)
+    session_id, history = await _load_session(app, user_id, request.session_id)
+
+    # Query rewriting for follow-ups
+    retrieval_query = request.query
+    if history:
+        retrieval_query = await llm_service.rewrite_query(request.query, history)
 
     strategy = factory.get(request.strategy)
     trace = tracing.create_recorder(
@@ -36,9 +79,9 @@ async def query_documents(request: QueryRequest, req: Request):
         collection=request.collection,
     )
 
-    # Retrieve
+    # Retrieve (use rewritten query for better retrieval)
     context = await strategy.retrieve(
-        query=request.query,
+        query=retrieval_query,
         collection=request.collection,
         trace=trace,
         top_k=request.top_k,
@@ -72,7 +115,7 @@ async def query_documents(request: QueryRequest, req: Request):
         if not is_sufficient:
             if request.sufficiency_action == "retry":
                 context = await strategy.retrieve(
-                    query=request.query,
+                    query=retrieval_query,
                     collection=request.collection,
                     trace=trace,
                     top_k=request.top_k * 2,
@@ -115,15 +158,17 @@ async def query_documents(request: QueryRequest, req: Request):
                     },
                     latency_ms=trace.total_latency_ms,
                     trace_id=trace.trace_id,
+                    session_id=session_id,
                 )
 
-    # Generate
+    # Generate (pass conversation history for contextual answers)
     answer = await strategy.generate(
         query=request.query,
         context=context,
         trace=trace,
         model=request.model,
         temperature=request.temperature,
+        history=history or None,
     )
 
     # Save trace
@@ -133,6 +178,11 @@ async def query_documents(request: QueryRequest, req: Request):
         answer_length=len(answer),
         model=request.model,
     )
+
+    # Update session history
+    history.append({"role": "user", "content": request.query})
+    history.append({"role": "assistant", "content": answer})
+    await _save_session(app, user_id, session_id, history)
 
     sources = [
         SourceInfo(
@@ -151,18 +201,34 @@ async def query_documents(request: QueryRequest, req: Request):
             "model": request.model,
             "top_k": request.top_k,
             "chunks_retrieved": len(context),
+            "query_rewritten": retrieval_query != request.query,
         },
         latency_ms=trace.total_latency_ms,
         trace_id=trace.trace_id,
+        session_id=session_id,
     )
 
 
 @router.post("/query/stream")
-async def query_stream(request: QueryRequest, req: Request):
+async def query_stream(
+    request: QueryRequest,
+    req: Request,
+    current_user: Optional[dict] = Depends(get_current_user),
+):
     """Streaming RAG query endpoint via SSE."""
     app = req.app
     factory = app.state.strategy_factory
     tracing = app.state.tracing_service
+    llm_service = app.state.llm_service
+
+    # Session management (load before generator to avoid race conditions)
+    user_id = _get_user_id(current_user)
+    session_id, history = await _load_session(app, user_id, request.session_id)
+
+    # Query rewriting for follow-ups
+    retrieval_query = request.query
+    if history:
+        retrieval_query = await llm_service.rewrite_query(request.query, history)
 
     async def event_generator():
         strategy = factory.get(request.strategy)
@@ -172,14 +238,14 @@ async def query_stream(request: QueryRequest, req: Request):
             collection=request.collection,
         )
 
-        # Phase 1: Retrieval
+        # Phase 1: Retrieval (use rewritten query)
         yield {
             "event": "status",
             "data": json.dumps({"phase": "retrieving"}),
         }
 
         context = await strategy.retrieve(
-            query=request.query,
+            query=retrieval_query,
             collection=request.collection,
             trace=trace,
             top_k=request.top_k,
@@ -210,7 +276,7 @@ async def query_stream(request: QueryRequest, req: Request):
             "data": json.dumps(sources, default=str),
         }
 
-        # Phase 3: Streaming generation
+        # Phase 3: Streaming generation (with history)
         yield {
             "event": "status",
             "data": json.dumps({"phase": "generating"}),
@@ -222,6 +288,7 @@ async def query_stream(request: QueryRequest, req: Request):
             context=context,
             model=request.model,
             temperature=request.temperature,
+            history=history or None,
         ):
             full_answer.append(token)
             yield {
@@ -238,7 +305,12 @@ async def query_stream(request: QueryRequest, req: Request):
             model=request.model,
         )
 
-        # Phase 4: Done
+        # Update session history
+        history.append({"role": "user", "content": request.query})
+        history.append({"role": "assistant", "content": answer_text})
+        await _save_session(app, user_id, session_id, history)
+
+        # Phase 4: Done (include session_id)
         yield {
             "event": "done",
             "data": json.dumps({
@@ -246,6 +318,8 @@ async def query_stream(request: QueryRequest, req: Request):
                 "latency_ms": trace.total_latency_ms,
                 "strategy": request.strategy.value,
                 "chunks_retrieved": len(context),
+                "session_id": session_id,
+                "query_rewritten": retrieval_query != request.query,
             }),
         }
 

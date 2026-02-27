@@ -1,5 +1,6 @@
 /**
  * Chat page — main RAG interface with streaming, upload sidebar, and pipeline config.
+ * Supports conversation sessions (history persisted in Redis).
  */
 
 import { useEffect, useCallback } from 'react';
@@ -15,9 +16,12 @@ export default function ChatPage() {
     messages,
     selectedStrategy,
     activeCollection,
+    sessionId,
     addUserMessage,
     addAssistantMessage,
     updateAssistantMessage,
+    setSessionId,
+    clearSession,
   } = useAppStore();
 
   const { state: stream, start: startStream, isStreaming } = useStreamQuery();
@@ -46,6 +50,11 @@ export default function ChatPage() {
         latencyMs: stream.latencyMs ?? undefined,
         strategy: stream.strategyUsed ?? undefined,
       });
+
+      // Save session_id from backend response
+      if (stream.sessionId) {
+        setSessionId(stream.sessionId);
+      }
     }
 
     if (stream.phase === 'error') {
@@ -63,9 +72,11 @@ export default function ChatPage() {
     stream.traceId,
     stream.latencyMs,
     stream.strategyUsed,
+    stream.sessionId,
     stream.error,
     streamingMsgId,
     updateAssistantMessage,
+    setSessionId,
   ]);
 
   const handleSend = useCallback(
@@ -78,9 +89,10 @@ export default function ChatPage() {
         query,
         strategy: selectedStrategy,
         collection: activeCollection,
+        session_id: sessionId ?? undefined,
       });
     },
-    [selectedStrategy, activeCollection, addUserMessage, addAssistantMessage, startStream],
+    [selectedStrategy, activeCollection, sessionId, addUserMessage, addAssistantMessage, startStream],
   );
 
   const strategyMeta = STRATEGY_MAP[selectedStrategy];
@@ -104,6 +116,14 @@ export default function ChatPage() {
 
       {/* Sidebar */}
       <div className="flex flex-col gap-3 overflow-y-auto">
+        {/* New Chat button */}
+        <button
+          onClick={clearSession}
+          className="w-full py-2 px-3 rounded-[10px] border border-serpent-border-light bg-serpent-surface text-serpent-text-muted hover:text-serpent-text-light hover:border-serpent-accent/30 transition-colors duration-200 text-[11px] font-mono uppercase tracking-[1.5px] flex items-center justify-center gap-2"
+        >
+          <span className="text-[13px]">+</span> New Chat
+        </button>
+
         {/* Upload section */}
         <div className="bg-serpent-surface border border-serpent-border-light rounded-[14px] p-[18px]">
           <h4 className="text-[10px] text-serpent-text-dark mb-3 uppercase tracking-[1.5px] font-mono">

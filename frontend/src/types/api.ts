@@ -6,7 +6,7 @@
 
 export type RAGStrategy = 'agentic' | 'corrective' | 'graph' | 'hybrid' | 'memo' | 'naive';
 
-export type DocumentStatus = 'pending' | 'processing' | 'indexed' | 'failed';
+export type DocumentStatus = 'pending' | 'processing' | 'indexed' | 'failed' | 'already_exists';
 
 // ── Query ──────────────────────────────────────────
 
@@ -38,6 +38,8 @@ export interface QueryRequest {
   check_sufficiency?: boolean;
   sufficiency_threshold?: number;
   sufficiency_action?: 'abstain' | 'retry';
+  // Conversation history
+  session_id?: string;
 }
 
 // ── Advisor Chatbot ─────────────────────────────────
@@ -74,6 +76,19 @@ export interface QueryResponse {
   metadata: Record<string, unknown>;
   latency_ms: number;
   trace_id: string;
+  session_id?: string;
+}
+
+// ── Chat Sessions ─────────────────────────────────
+
+export interface ChatSessionInfo {
+  session_id: string;
+  ttl_seconds: number;
+}
+
+export interface SessionListResponse {
+  sessions: ChatSessionInfo[];
+  total: number;
 }
 
 // ── SSE Streaming ──────────────────────────────────
@@ -140,12 +155,25 @@ export interface DocumentResponse {
   collection: string;
   file_size: number;
   created_at: string;
+  processing_phase?: string;
+  content_hash?: string;
 }
 
 export interface DocumentDetail extends DocumentResponse {
   content_type: string;
   error_message?: string;
   metadata: Record<string, unknown>;
+}
+
+export interface DocumentListResponse {
+  documents: DocumentResponse[];
+  total: number;
+}
+
+export interface DeleteDocumentResponse {
+  deleted: boolean;
+  doc_id: string;
+  chunks_removed: number;
 }
 
 export interface CollectionInfo {

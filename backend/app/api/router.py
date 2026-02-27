@@ -12,6 +12,7 @@ from app.api.v1 import (
     health,
     metrics,
     query,
+    sessions,
     strategies,
     traces,
 )
@@ -30,3 +31,4 @@ api_router.include_router(traces.router)
 api_router.include_router(graph.router)
 api_router.include_router(metrics.router)
 api_router.include_router(advisor.router)
+api_router.include_router(sessions.router)

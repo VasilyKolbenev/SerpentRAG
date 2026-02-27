@@ -127,6 +127,92 @@ class RedisService:
         key = f"serpent:advisor:{session_id}"
         await self._client.setex(key, ttl, json.dumps(history))
 
+    # ── Chat Sessions ──
+
+    async def get_chat_session(
+        self, user_id: str, session_id: str
+    ) -> Optional[list[dict]]:
+        """Get chat conversation history for a user session."""
+        key = f"serpent:chat:{user_id}:{session_id}"
+        data = await self._client.get(key)
+        if data:
+            return json.loads(data)
+        return None
+
+    async def set_chat_session(
+        self,
+        user_id: str,
+        session_id: str,
+        history: list[dict],
+        ttl: int = 14400,
+    ) -> None:
+        """Save chat conversation history (4h TTL)."""
+        key = f"serpent:chat:{user_id}:{session_id}"
+        await self._client.setex(key, ttl, json.dumps(history))
+
+    async def delete_chat_session(self, user_id: str, session_id: str) -> bool:
+        """Delete a chat session. Returns True if key existed."""
+        key = f"serpent:chat:{user_id}:{session_id}"
+        deleted = await self._client.delete(key)
+        return deleted > 0
+
+    async def list_chat_sessions(self, user_id: str) -> list[dict]:
+        """List all active chat sessions for a user via SCAN."""
+        pattern = f"serpent:chat:{user_id}:*"
+        sessions: list[dict] = []
+
+        async for key in self._client.scan_iter(match=pattern, count=100):
+            # Extract session_id from key
+            session_id = key.split(":")[-1]
+            ttl = await self._client.ttl(key)
+            sessions.append({"session_id": session_id, "ttl_seconds": ttl})
+
+        return sessions
+
+    # ── File Hash Dedup ──
+
+    async def get_file_hash(self, collection: str, file_hash: str) -> Optional[str]:
+        """Get existing doc_id for a file content hash. Returns None if new."""
+        key = f"serpent:file_hash:{collection}:{file_hash}"
+        return await self._client.get(key)
+
+    async def set_file_hash(
+        self, collection: str, file_hash: str, doc_id: str, ttl: int = 86400
+    ) -> None:
+        """Store file content hash → doc_id mapping (24h TTL)."""
+        key = f"serpent:file_hash:{collection}:{file_hash}"
+        await self._client.setex(key, ttl, doc_id)
+
+    async def delete_file_hash(self, collection: str, file_hash: str) -> None:
+        """Remove file hash mapping (called on document deletion)."""
+        key = f"serpent:file_hash:{collection}:{file_hash}"
+        await self._client.delete(key)
+
+    # ── Document Status ──
+
+    async def list_doc_statuses(
+        self, collection: str | None = None
+    ) -> list[dict]:
+        """List all document statuses from Redis via SCAN."""
+        pattern = "serpent:trace:doc_status:*"
+        documents: list[dict] = []
+
+        async for key in self._client.scan_iter(match=pattern, count=100):
+            data = await self._client.get(key)
+            if data:
+                doc = json.loads(data)
+                if collection is None or doc.get("collection") == collection:
+                    documents.append(doc)
+
+        documents.sort(key=lambda d: d.get("created_at", ""), reverse=True)
+        return documents
+
+    async def delete_doc_status(self, doc_id: str) -> bool:
+        """Delete a document status key from Redis. Returns True if key existed."""
+        key = f"serpent:trace:doc_status:{doc_id}"
+        deleted = await self._client.delete(key)
+        return deleted > 0
+
     # ── Health ──
 
     async def health_check(self) -> bool:

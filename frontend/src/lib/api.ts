@@ -10,6 +10,8 @@ import type {
   CompareResponse,
   DocumentResponse,
   DocumentDetail,
+  DocumentListResponse,
+  DeleteDocumentResponse,
   CollectionListResponse,
   StrategyListResponse,
   RecommendationRequest,
@@ -20,6 +22,7 @@ import type {
   HealthResponse,
   AdvisorChatRequest,
   AdvisorChatResponse,
+  SessionListResponse,
 } from '@/types/api';
 
 // ── Base ───────────────────────────────────────────
@@ -148,6 +151,19 @@ export async function getDocument(id: string): Promise<DocumentDetail> {
   return request<DocumentDetail>(`/documents/${id}`);
 }
 
+export async function listDocuments(
+  collection?: string,
+): Promise<DocumentListResponse> {
+  const params = collection ? `?collection=${encodeURIComponent(collection)}` : '';
+  return request<DocumentListResponse>(`/documents${params}`);
+}
+
+export async function deleteDocument(id: string): Promise<DeleteDocumentResponse> {
+  return request<DeleteDocumentResponse>(`/documents/${id}`, {
+    method: 'DELETE',
+  });
+}
+
 // ── Collections ────────────────────────────────────
 
 export async function getCollections(): Promise<CollectionListResponse> {
@@ -216,6 +232,18 @@ export async function advisorChat(
   });
 }
 
+// ── Sessions ──────────────────────────────────────
+
+export async function listSessions(): Promise<SessionListResponse> {
+  return request<SessionListResponse>('/sessions');
+}
+
+export async function deleteSession(sessionId: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/sessions/${sessionId}`, {
+    method: 'DELETE',
+  });
+}
+
 // ── Health ──────────────────────────────────────────
 
 export async function health(): Promise<HealthResponse> {
@@ -230,6 +258,8 @@ export const api = {
   compare,
   uploadDocument,
   getDocument,
+  listDocuments,
+  deleteDocument,
   getCollections,
   getStrategies,
   recommend,
@@ -237,6 +267,8 @@ export const api = {
   getGraph,
   getQualityMetrics,
   advisorChat,
+  listSessions,
+  deleteSession,
   health,
 } as const;
 

@@ -5,6 +5,7 @@ Base RAG strategy with tracing hooks and context sufficiency check.
 import json
 import logging
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from app.services.embedding import EmbeddingService
 from app.services.llm import LLMService
@@ -64,11 +65,12 @@ class BaseRAGStrategy(ABC):
         trace: TraceRecorder,
         model: str = "gpt-4o",
         temperature: float = 0.1,
+        history: Optional[list[dict]] = None,
     ) -> str:
         """Generate answer from context using LLM."""
         trace.start_step(
             "generation",
-            input_summary=f"model={model}, context_chunks={len(context)}",
+            input_summary=f"model={model}, context_chunks={len(context)}, history_msgs={len(history) if history else 0}",
         )
 
         answer = await self.llm.generate(
@@ -76,6 +78,7 @@ class BaseRAGStrategy(ABC):
             context=context,
             model=model,
             temperature=temperature,
+            history=history,
         )
 
         trace.end_step(
@@ -90,6 +93,7 @@ class BaseRAGStrategy(ABC):
         context: list[dict],
         model: str = "gpt-4o",
         temperature: float = 0.1,
+        history: Optional[list[dict]] = None,
     ):
         """Stream answer tokens from LLM."""
         async for token in self.llm.stream_generate(
@@ -97,6 +101,7 @@ class BaseRAGStrategy(ABC):
             context=context,
             model=model,
             temperature=temperature,
+            history=history,
         ):
             yield token
 

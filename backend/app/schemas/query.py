@@ -52,6 +52,9 @@ class QueryRequest(BaseModel):
     sufficiency_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     sufficiency_action: str = "abstain"  # abstain | retry
 
+    # Conversation history
+    session_id: Optional[str] = Field(None, description="Chat session ID for conversation context")
+
 
 class SourceInfo(BaseModel):
     content: str
@@ -66,6 +69,7 @@ class QueryResponse(BaseModel):
     metadata: dict
     latency_ms: float
     trace_id: str
+    session_id: Optional[str] = None
 
 
 class StreamChunk(BaseModel):

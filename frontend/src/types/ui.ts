@@ -9,6 +9,7 @@ import type { RAGStrategy, SourceInfo } from './api';
 export type TabId =
   | 'strategies'
   | 'chat'
+  | 'documents'
   | 'debugger'
   | 'compare'
   | 'graph'
@@ -52,6 +53,7 @@ export interface StreamState {
   traceId: string | null;
   latencyMs: number | null;
   strategyUsed: RAGStrategy | null;
+  sessionId: string | null;
   error: string | null;
 }
 
