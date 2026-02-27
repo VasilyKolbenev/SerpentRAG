@@ -1,111 +1,156 @@
 /**
- * Drag-drop upload zone — ported from JSX, rewired to real API.
+ * Drag-drop upload zone — uses global Zustand store for upload state
+ * so status persists across page navigation.
+ *
+ * Features:
+ *  - SHA256 dedup (backend returns already_exists)
+ *  - Exponential backoff polling (2s → 4s → 8s → 16s → 30s)
+ *  - Granular processing phases (parsing → chunking → embedding → storing → extracting_entities)
+ *  - Global upload state survives page changes
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { formatFileSize } from '@/lib/utils';
 import { useAppStore } from '@/stores/appStore';
+import type { UploadedFile } from '@/stores/appStore';
 
-interface UploadedFile {
-  id: string;
-  name: string;
-  size: number;
-  status: 'uploading' | 'processing' | 'indexed' | 'failed';
-  error?: string;
-}
+const PHASE_LABELS: Record<string, string> = {
+  queued: 'Queued',
+  parsing: 'Parsing',
+  chunking: 'Chunking',
+  embedding: 'Embedding',
+  storing: 'Storing',
+  extracting_entities: 'Extracting entities',
+};
+
+const BACKOFF_INITIAL_MS = 2000;
+const BACKOFF_MAX_MS = 30_000;
+const BACKOFF_MULTIPLIER = 2;
+const MAX_POLL_TIME_MS = 5 * 60 * 1000; // 5 minutes
 
 export default function UploadZone() {
   const [dragging, setDragging] = useState(false);
-  const [files, setFiles] = useState<UploadedFile[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const mountedRef = useRef(true);
+  const pollTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
   const activeCollection = useAppStore((s) => s.activeCollection);
+  const uploads = useAppStore((s) => s.uploads);
+  const addUpload = useAppStore((s) => s.addUpload);
+  const updateUpload = useAppStore((s) => s.updateUpload);
+  const clearFinishedUploads = useAppStore((s) => s.clearFinishedUploads);
+
+  // Track mount state for polling cleanup
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      // Clear all pending polling timers
+      for (const timer of pollTimers.current.values()) {
+        clearTimeout(timer);
+      }
+      pollTimers.current.clear();
+    };
+  }, []);
+
+  // Resume polling for any in-progress uploads on mount
+  useEffect(() => {
+    for (const upload of Object.values(uploads)) {
+      if (upload.status === 'processing') {
+        pollDocumentStatus(upload.id);
+      }
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const uploadFile = useCallback(
     async (file: File) => {
-      const tempId = `${Date.now()}-${file.name}`;
+      const tempId = `temp-${Date.now()}-${file.name}`;
 
-      setFiles((prev) => [
-        ...prev,
-        {
-          id: tempId,
-          name: file.name,
-          size: file.size,
-          status: 'uploading',
-        },
-      ]);
+      addUpload({
+        id: tempId,
+        name: file.name,
+        size: file.size,
+        status: 'uploading',
+        collection: activeCollection,
+      });
 
       try {
         const res = await api.uploadDocument(file, activeCollection);
 
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === tempId
-              ? { ...f, id: res.id, status: 'processing' }
-              : f,
-          ),
-        );
+        if (!mountedRef.current) return;
 
-        // Poll for status
-        pollDocumentStatus(res.id, tempId);
+        if (res.status === 'already_exists') {
+          // Duplicate — update with real id and already_exists status
+          updateUpload(tempId, {
+            id: res.id,
+            status: 'already_exists',
+          });
+          return;
+        }
+
+        // Replace temp entry with real doc_id
+        updateUpload(tempId, {
+          id: res.id,
+          status: 'processing',
+          processing_phase: 'queued',
+        });
+
+        // Start polling
+        pollDocumentStatus(res.id);
       } catch (err) {
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === tempId
-              ? {
-                  ...f,
-                  status: 'failed',
-                  error: err instanceof Error ? err.message : 'Upload failed',
-                }
-              : f,
-          ),
-        );
+        if (!mountedRef.current) return;
+        updateUpload(tempId, {
+          status: 'failed',
+          error: err instanceof Error ? err.message : 'Upload failed',
+        });
       }
     },
-    [activeCollection],
+    [activeCollection, addUpload, updateUpload],
   );
 
   const pollDocumentStatus = useCallback(
-    async (docId: string, tempId: string) => {
-      let attempts = 0;
-      const maxAttempts = 60; // 5 minutes max
+    (docId: string) => {
+      let delay = BACKOFF_INITIAL_MS;
+      const startTime = Date.now();
 
       const check = async () => {
+        if (!mountedRef.current) return;
+        if (Date.now() - startTime > MAX_POLL_TIME_MS) return;
+
         try {
           const doc = await api.getDocument(docId);
+          if (!mountedRef.current) return;
 
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === docId || f.id === tempId
-                ? {
-                    ...f,
-                    id: docId,
-                    status: doc.status as UploadedFile['status'],
-                    error:
-                      doc.status === 'failed'
-                        ? 'Processing failed'
-                        : undefined,
-                  }
-                : f,
-            ),
-          );
+          updateUpload(docId, {
+            status: doc.status as UploadedFile['status'],
+            processing_phase: doc.processing_phase ?? undefined,
+            error: doc.status === 'failed' ? 'Processing failed' : undefined,
+          });
 
-          if (doc.status === 'processing' && attempts < maxAttempts) {
-            attempts++;
-            setTimeout(check, 5000);
+          if (doc.status === 'processing') {
+            // Exponential backoff
+            delay = Math.min(delay * BACKOFF_MULTIPLIER, BACKOFF_MAX_MS);
+            const timer = setTimeout(check, delay);
+            pollTimers.current.set(docId, timer);
+          } else {
+            pollTimers.current.delete(docId);
           }
         } catch {
-          // Silently continue polling
-          if (attempts < maxAttempts) {
-            attempts++;
-            setTimeout(check, 5000);
-          }
+          if (!mountedRef.current) return;
+          // Retry with backoff on network error
+          delay = Math.min(delay * BACKOFF_MULTIPLIER, BACKOFF_MAX_MS);
+          const timer = setTimeout(check, delay);
+          pollTimers.current.set(docId, timer);
         }
       };
 
-      setTimeout(check, 3000);
+      const timer = setTimeout(check, BACKOFF_INITIAL_MS);
+      pollTimers.current.set(docId, timer);
     },
-    [],
+    [updateUpload],
   );
 
   const handleDrop = useCallback(
@@ -125,6 +170,14 @@ export default function UploadZone() {
       if (inputRef.current) inputRef.current.value = '';
     },
     [uploadFile],
+  );
+
+  const uploadList = Object.values(uploads);
+  const hasFinished = uploadList.some(
+    (f) =>
+      f.status === 'indexed' ||
+      f.status === 'failed' ||
+      f.status === 'already_exists',
   );
 
   return (
@@ -164,9 +217,9 @@ export default function UploadZone() {
       </div>
 
       {/* File list */}
-      {files.length > 0 && (
+      {uploadList.length > 0 && (
         <div className="mt-2.5">
-          {files.map((f) => (
+          {uploadList.map((f) => (
             <div
               key={f.id}
               className="flex items-center gap-2 px-2.5 py-[6px] mb-[3px] bg-serpent-surface rounded-[6px] border border-serpent-border-light"
@@ -174,9 +227,11 @@ export default function UploadZone() {
               <span className="text-[10px]">
                 {f.status === 'indexed'
                   ? '\u2705'
-                  : f.status === 'failed'
-                    ? '\u274C'
-                    : '\u23F3'}
+                  : f.status === 'already_exists'
+                    ? '\u26A0\uFE0F'
+                    : f.status === 'failed'
+                      ? '\u274C'
+                      : '\u23F3'}
               </span>
               <span className="text-[11px] text-serpent-text-muted flex-1 font-mono truncate">
                 {f.name}
@@ -190,15 +245,31 @@ export default function UploadZone() {
                   color:
                     f.status === 'indexed'
                       ? '#2DD4A8'
-                      : f.status === 'failed'
-                        ? '#ef4444'
-                        : '#C8F547',
+                      : f.status === 'already_exists'
+                        ? '#facc15'
+                        : f.status === 'failed'
+                          ? '#ef4444'
+                          : '#C8F547',
                 }}
               >
-                {f.status}
+                {f.status === 'processing' && f.processing_phase
+                  ? PHASE_LABELS[f.processing_phase] ?? f.processing_phase
+                  : f.status === 'already_exists'
+                    ? 'duplicate'
+                    : f.status}
               </span>
             </div>
           ))}
+
+          {/* Clear finished button */}
+          {hasFinished && (
+            <button
+              onClick={clearFinishedUploads}
+              className="w-full mt-1 py-1 text-[9px] text-serpent-text-darker hover:text-serpent-text-muted font-mono uppercase tracking-wider transition-colors"
+            >
+              Clear finished
+            </button>
+          )}
         </div>
       )}
     </div>
