@@ -8,6 +8,7 @@ import DebuggerPage from '@/pages/DebuggerPage';
 import ComparePage from '@/pages/ComparePage';
 import GraphPage from '@/pages/GraphPage';
 import QualityPage from '@/pages/QualityPage';
+import DocumentsPage from '@/pages/DocumentsPage';
 import { AdvisorChatbot } from '@/components/advisor/AdvisorChatbot';
 import { useAppStore } from '@/stores/appStore';
 import { api } from '@/lib/api';
@@ -49,6 +50,7 @@ function AppShell() {
         <Routes>
           <Route path="/strategies" element={<StrategiesPage />} />
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/documents" element={<DocumentsPage />} />
           <Route path="/debugger" element={<DebuggerPage />} />
           <Route path="/debugger/:traceId" element={<DebuggerPage />} />
           <Route path="/compare" element={<ComparePage />} />

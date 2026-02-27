@@ -102,6 +102,78 @@ class Neo4jService:
                 props=props,
             )
 
+    async def bulk_create_entities(
+        self,
+        entities: list[dict],
+        collection: str = "default",
+    ) -> int:
+        """Batch create/merge entities. Each dict: {name, type, properties?}.
+
+        Returns count of processed entities.
+        """
+        if not entities:
+            return 0
+        params = [
+            {
+                "name": e["name"],
+                "type": e["type"],
+                "props": e.get("properties", {}),
+            }
+            for e in entities
+        ]
+        async with self._driver.session() as session:
+            result = await session.run(
+                """
+                UNWIND $entities AS entity
+                MERGE (e:Entity {name: entity.name, type: entity.type, collection: $collection})
+                ON CREATE SET e += entity.props, e.created_at = datetime()
+                ON MATCH SET e += entity.props, e.updated_at = datetime()
+                RETURN count(e) as cnt
+                """,
+                entities=params,
+                collection=collection,
+            )
+            record = await result.single()
+            return record["cnt"] if record else 0
+
+    async def bulk_create_relationships(
+        self,
+        relationships: list[dict],
+        collection: str = "default",
+    ) -> int:
+        """Batch create relationships. Each dict: {source, target, type, properties?}.
+
+        Returns count of processed relationships.
+        """
+        if not relationships:
+            return 0
+        params = [
+            {
+                "source": r["source"],
+                "target": r["target"],
+                "rel_type": r["type"],
+                "props": r.get("properties", {}),
+            }
+            for r in relationships
+        ]
+        # Neo4j doesn't allow parameterized rel types in MERGE directly,
+        # so we use APOC for dynamic relationship creation
+        async with self._driver.session() as session:
+            result = await session.run(
+                """
+                UNWIND $rels AS rel
+                MATCH (a:Entity {name: rel.source, collection: $collection})
+                MATCH (b:Entity {name: rel.target, collection: $collection})
+                CALL apoc.merge.relationship(a, rel.rel_type, {}, rel.props, b, {})
+                YIELD rel AS r
+                RETURN count(r) as cnt
+                """,
+                rels=params,
+                collection=collection,
+            )
+            record = await result.single()
+            return record["cnt"] if record else 0
+
     async def find_entities(
         self,
         names: list[str],
@@ -251,6 +323,39 @@ class Neo4jService:
                 "nodes": record["nodeList"],
                 "edges": [e for e in record["edgeList"] if e["source"] and e["target"]],
             }
+
+    async def delete_by_document(
+        self,
+        document_id: str,
+        collection: str = "default",
+    ) -> int:
+        """Delete all entities and relationships for a given document_id.
+
+        Returns count of deleted nodes.
+        """
+        async with self._driver.session() as session:
+            result = await session.run(
+                """
+                MATCH (e:Entity {collection: $collection})
+                WHERE e.document_id = $doc_id
+                DETACH DELETE e
+                RETURN count(e) as cnt
+                """,
+                doc_id=document_id,
+                collection=collection,
+            )
+            record = await result.single()
+            deleted = record["cnt"] if record else 0
+            if deleted:
+                logger.info(
+                    "Deleted entities by document",
+                    extra={
+                        "document_id": document_id,
+                        "collection": collection,
+                        "count": deleted,
+                    },
+                )
+            return deleted
 
     async def health_check(self) -> bool:
         """Check Neo4j connectivity."""

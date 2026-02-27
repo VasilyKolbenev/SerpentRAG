@@ -133,6 +133,42 @@ class QdrantService:
             for r in results
         ]
 
+    async def delete_by_filter(
+        self,
+        collection_name: str,
+        field: str,
+        value: str,
+    ) -> int:
+        """Delete points matching a payload filter. Returns count of deleted points."""
+        count_result = await self._client.count(
+            collection_name=collection_name,
+            count_filter=Filter(
+                must=[FieldCondition(key=field, match=MatchValue(value=value))]
+            ),
+            exact=True,
+        )
+        points_count = count_result.count
+
+        if points_count > 0:
+            await self._client.delete(
+                collection_name=collection_name,
+                points_selector=Filter(
+                    must=[FieldCondition(key=field, match=MatchValue(value=value))]
+                ),
+                wait=True,
+            )
+            logger.info(
+                "Deleted points by filter",
+                extra={
+                    "collection": collection_name,
+                    "field": field,
+                    "value": value,
+                    "count": points_count,
+                },
+            )
+
+        return points_count
+
     async def delete_collection(self, collection_name: str) -> None:
         """Delete a collection."""
         await self._client.delete_collection(collection_name=collection_name)

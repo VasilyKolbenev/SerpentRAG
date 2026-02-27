@@ -216,6 +216,7 @@ export const ADVISOR_QUESTIONS: AdvisorQuestion[] = [
 export const TABS: TabInfo[] = [
   { id: 'strategies', label: 'Strategies', icon: '\u25C8' },
   { id: 'chat', label: 'Chat', icon: '\u25C9' },
+  { id: 'documents', label: 'Documents', icon: '\u25AB' },
   { id: 'debugger', label: 'Debugger', icon: '\u25C6' },
   { id: 'compare', label: 'Compare', icon: '\u2261' },
   { id: 'graph', label: 'Graph', icon: '\u25CE' },
