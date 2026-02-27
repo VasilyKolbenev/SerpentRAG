@@ -81,10 +81,13 @@ services:
       - "traefik.http.routers.frontend.middlewares=frontend-headers,rate-limit"
       - "traefik.http.middlewares.rate-limit.ratelimit.average=100"
       - "traefik.http.middlewares.rate-limit.ratelimit.burst=50"
+    ports:
+      - "3000:3000"
     networks:
       - serpent-public
+      - serpent-internal
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:3000 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -168,6 +171,13 @@ services:
       - NEO4J_PASSWORD=${NEO4J_PASSWORD}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-local}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
+      - EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS:-384}
+      - SENTENCE_TRANSFORMERS_HOME=/app/models
+      - HF_HOME=/app/models
+      - TRANSFORMERS_OFFLINE=1
+      - HF_HUB_OFFLINE=1
     depends_on:
       - api
       - redis
@@ -243,14 +253,13 @@ services:
     <<: *common
     read_only: false
     environment:
-      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}
       QDRANT__SERVICE__ENABLE_TLS: "false"
     volumes:
       - qdrant-data:/qdrant/storage
     networks:
       - serpent-internal
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:6333/readyz"]
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/localhost/6333' || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3

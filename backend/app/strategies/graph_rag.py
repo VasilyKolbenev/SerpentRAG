@@ -63,7 +63,7 @@ class GraphRAGStrategy(BaseRAGStrategy):
             # Build graph context strings
             for node in nodes:
                 graph_context.append({
-                    "content": f"Entity: {node.name} (type: {node.type}). Properties: {json.dumps(node.properties)}",
+                    "content": f"Entity: {node.name} (type: {node.type}). Properties: {json.dumps(node.properties, default=str)}",
                     "score": 0.9,
                     "metadata": {"source": "knowledge_graph", "entity": node.name, "type": node.type},
                 })
