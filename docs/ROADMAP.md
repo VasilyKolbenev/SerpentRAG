@@ -17,7 +17,7 @@
 - [x] BSL 1.1 license (source-available, production use requires license)
 - [ ] API documentation (OpenAPI/Swagger export)
 - [ ] CONTRIBUTING.md + CODE_OF_CONDUCT.md
-- [ ] Security policy (SECURITY.md)
+- [x] Security policy (SECURITY.md)
 
 ## Phase 2: Landing Pages (Week 3-4)
 
@@ -69,6 +69,9 @@
 - [ ] Per-tenant resource limits (collections, storage, queries/month)
 - [ ] Tenant admin dashboard (usage stats, billing, API keys)
 - [ ] Data isolation audit (PostgreSQL RLS, Qdrant collection prefixing)
+- [ ] RBAC enforcement (admin / user / readonly roles)
+- [ ] Per-user rate limiting (JWT-based throttling)
+- [ ] Audit logging (document access, query history, admin actions)
 - [ ] Auto-scaling: Kubernetes (Helm chart)
 - [ ] CDN for frontend (Cloudflare)
 - [ ] Rate limiting per API key
@@ -83,9 +86,50 @@
 - [ ] Enterprise license server (license key validation, expiry)
 - [ ] Support portal (Zendesk / Intercom)
 - [ ] SLA documentation (99.9% uptime, 4h response time)
+- [ ] Encryption at rest (AES-256 field-level for sensitive DB columns)
+- [ ] Secret management (HashiCorp Vault / Docker Secrets)
+- [ ] Penetration testing (annual, third-party)
+- [ ] Security incident response plan
+- [ ] Data retention policies (configurable per tenant)
 - [ ] Compliance:
   - International: SOC 2 Type II, GDPR
   - RU/CIS: 152-FZ, GOST encryption standards
+
+---
+
+## Security Architecture
+
+> Full details: [SECURITY.md](../SECURITY.md)
+
+| Security Layer | Status | Details |
+|----------------|--------|---------|
+| Authentication (JWT) | Implemented | HS256, 24h expiry, jti, role claims |
+| CORS | Implemented | Restrictive (frontend origin only, no wildcards) |
+| TLS / HTTPS | Implemented | Traefik + Let's Encrypt, auto-renewal |
+| Container Hardening | Implemented | Non-root, read-only FS, no-new-privileges |
+| Security Headers | Implemented | CSP, HSTS, X-Frame-Options, Permissions-Policy |
+| Input Validation | Implemented | Pydantic v2, strict bounds, MIME whitelist |
+| Network Isolation | Implemented | Internal/public Docker networks |
+| DevSecOps CI/CD | Implemented | Bandit, Semgrep, Gitleaks, Trivy, pip-audit, SBOM |
+| Rate Limiting (global) | Implemented | Traefik: 50 req/s API, 100 req/s frontend |
+| Structured Logging | Implemented | structlog + request_id + OpenTelemetry |
+| Multi-Tenancy | Implemented | Optional tenant isolation via JWT claims |
+| RBAC | Planned (Q2) | Role-based endpoint authorization |
+| Encryption at Rest | Planned (Q2) | AES-256 field-level encryption |
+| Audit Logging | Planned (Q2) | Immutable action log (who, what, when) |
+| Per-User Rate Limiting | Planned (Q2) | JWT-based throttling |
+| Vault Integration | Planned (Q3) | HashiCorp Vault / Docker Secrets |
+| Penetration Testing | Planned (Q3) | Annual third-party assessment |
+| SOC 2 Type II | Planned (Q4) | Formal compliance certification |
+| GOST Encryption | Planned (Q4) | Russian government standards |
+
+### Key Security Differentiators
+
+- **Data Sovereignty:** self-hosted deployment = data never leaves customer infrastructure
+- **Air-Gapped Support:** offline Docker images + local Ollama LLM for classified environments
+- **No Vendor Lock-In:** bring your own LLM provider (OpenAI, Anthropic, Ollama, any OpenAI-compatible)
+- **152-FZ / GDPR:** inherent compliance through self-hosted architecture
+- **Defense in Depth:** 11 security layers implemented before first customer
 
 ---
 

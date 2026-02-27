@@ -6,7 +6,8 @@
 ![React](https://img.shields.io/badge/react-18-61dafb)
 ![License](https://img.shields.io/badge/license-BSL--1.1-orange)
 ![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)
-![Tests](https://img.shields.io/badge/tests-139%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-175%20passed-brightgreen)
+![Security](https://img.shields.io/badge/security-hardened-green)
 ![Docker](https://img.shields.io/badge/docker-compose-2496ED)
 
 ---
@@ -95,7 +96,7 @@ curl http://localhost:8000/health
 | **Frontend** | React 18, TypeScript, Tailwind CSS, Zustand, Vite |
 | **Backend** | FastAPI, Uvicorn, Python 3.12, Pydantic v2 |
 | **LLM** | LiteLLM (OpenAI, Anthropic, Ollama) |
-| **Embeddings** | sentence-transformers (BGE-M3, 1024-dim, local) |
+| **Embeddings** | sentence-transformers (all-MiniLM-L6-v2, 384-dim, local) |
 | **Vector Store** | Qdrant v1.11 |
 | **Graph Store** | Neo4j 5.22 Community (optional) |
 | **Database** | PostgreSQL 16 + pgvector |
@@ -118,7 +119,7 @@ serpent-rag-platform/
 │   │   ├── workers/         # Celery tasks
 │   │   ├── main.py          # App factory
 │   │   └── config.py        # Settings (pydantic-settings)
-│   ├── tests/               # 139 tests, 80%+ coverage
+│   ├── tests/               # 175 tests, 80%+ coverage
 │   ├── alembic/             # Database migrations
 │   ├── requirements.txt
 │   └── Dockerfile
@@ -173,6 +174,20 @@ cd frontend
 npm ci
 npm run dev
 ```
+
+## Security
+
+SerpentRAG is built with security as a first-class concern. 11 security layers are implemented out of the box:
+
+- **Authentication:** JWT with expiration, unique token IDs, role claims
+- **Encryption in transit:** TLS 1.2+ via Traefik + Let's Encrypt
+- **Container hardening:** non-root users, read-only filesystem, no-new-privileges
+- **DevSecOps CI/CD:** Bandit, Semgrep, Gitleaks, Trivy, pip-audit, SBOM generation
+- **Input validation:** Pydantic v2 schemas with strict bounds, file upload whitelist
+- **Network isolation:** internal/public Docker network separation
+- **Security headers:** CSP, HSTS, X-Frame-Options, Permissions-Policy
+
+See [SECURITY.md](SECURITY.md) for full security policy, vulnerability reporting, and compliance roadmap.
 
 ## License
 
