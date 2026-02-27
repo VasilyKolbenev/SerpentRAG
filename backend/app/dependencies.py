@@ -68,3 +68,16 @@ async def require_auth(
     if user is None:
         raise HTTPException(status_code=401, detail="Authentication required")
     return user
+
+
+async def require_auth_in_production(
+    user: Optional[dict] = Depends(get_current_user),
+) -> Optional[dict]:
+    """Require auth in production, optional in development.
+
+    Self-hosted deployments often run without auth. This dependency
+    enforces auth only when ENVIRONMENT=production.
+    """
+    if settings.is_production and user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return user

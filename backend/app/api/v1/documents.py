@@ -5,6 +5,7 @@ Document upload and management endpoints.
 import hashlib
 import logging
 import os
+import pathlib
 import shutil
 import uuid
 from datetime import datetime
@@ -35,7 +36,7 @@ ALLOWED_TYPES = {
 }
 
 
-@router.post("/documents/upload", response_model=DocumentResponse)
+@router.post("/documents/upload", response_model=DocumentResponse, status_code=201)
 async def upload_document(
     req: Request,
     file: UploadFile = File(...),
@@ -46,10 +47,22 @@ async def upload_document(
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(400, f"Unsupported file type: {file.content_type}")
 
-    if file.size and file.size > settings.max_upload_size:
-        raise HTTPException(400, f"File too large (max {settings.max_upload_size // 1024 // 1024}MB)")
-
-    content = await file.read()
+    # A6: Chunked reading with size limit to prevent OOM
+    max_size = settings.max_upload_size
+    chunks: list[bytes] = []
+    total_size = 0
+    while True:
+        chunk = await file.read(1024 * 1024)  # 1MB chunks
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > max_size:
+            raise HTTPException(
+                413,
+                f"File too large (max {max_size // 1024 // 1024}MB)",
+            )
+        chunks.append(chunk)
+    content = b"".join(chunks)
 
     # Check for duplicate via SHA256 content hash
     content_hash = hashlib.sha256(content).hexdigest()
@@ -77,16 +90,42 @@ async def upload_document(
 
     doc_id = str(uuid.uuid4())
 
+    # A1: Sanitize filename to prevent path traversal
+    safe_name = pathlib.PurePosixPath(file.filename).name
+    if not safe_name or safe_name.startswith("."):
+        raise HTTPException(400, "Invalid filename")
+
     # Save file to disk
     upload_dir = os.path.join(settings.upload_dir, doc_id)
     os.makedirs(upload_dir, exist_ok=True)
-    file_path = os.path.join(upload_dir, file.filename)
+    file_path = os.path.join(upload_dir, safe_name)
+
+    # Verify resolved path is inside upload_dir (defense in depth)
+    if not os.path.realpath(file_path).startswith(os.path.realpath(upload_dir)):
+        raise HTTPException(400, "Invalid filename")
 
     async with aiofiles.open(file_path, "wb") as f:
         await f.write(content)
 
-    # Store content hash → doc_id mapping in Redis
-    await cache.set_file_hash(collection, content_hash, doc_id)
+    # B7: Atomic set — if another concurrent upload already stored this hash,
+    # return the existing document instead of creating a duplicate.
+    hash_set = await cache.set_file_hash(collection, content_hash, doc_id)
+    if not hash_set:
+        # Another upload won the race — clean up and return existing
+        shutil.rmtree(upload_dir, ignore_errors=True)
+        existing_doc_id = await cache.get_file_hash(collection, content_hash)
+        status_data = await cache.get_trace(f"doc_status:{existing_doc_id}") if existing_doc_id else None
+        return DocumentResponse(
+            id=existing_doc_id or doc_id,
+            filename=status_data.get("filename", safe_name) if status_data else safe_name,
+            status="already_exists",
+            chunks=status_data.get("chunks", 0) if status_data else 0,
+            collection=collection,
+            file_size=len(content),
+            created_at=status_data.get("created_at", "") if status_data else "",
+            processing_phase=None,
+            content_hash=content_hash,
+        )
 
     # Dispatch Celery task for background processing
     from app.workers.tasks.ingest import process_document_task
@@ -95,7 +134,7 @@ async def upload_document(
         doc_id=doc_id,
         file_path=file_path,
         collection=collection,
-        filename=file.filename,
+        filename=safe_name,
         content_type=file.content_type,
         file_size=len(content),
         content_hash=content_hash,
@@ -103,7 +142,7 @@ async def upload_document(
 
     return DocumentResponse(
         id=doc_id,
-        filename=file.filename,
+        filename=safe_name,
         status="processing",
         chunks=0,
         collection=collection,
@@ -117,28 +156,33 @@ async def upload_document(
 async def list_documents(
     req: Request,
     collection: Optional[str] = Query(None, description="Filter by collection"),
+    limit: int = Query(50, ge=1, le=200, description="Max documents per page"),
+    offset: int = Query(0, ge=0, description="Offset for pagination"),
 ):
-    """List all documents with their processing status."""
+    """List documents with pagination and optional collection filter."""
     cache = req.app.state.cache
     documents = await cache.list_doc_statuses(collection=collection)
 
-    doc_responses = []
-    for doc in documents:
-        doc_responses.append(
-            DocumentResponse(
-                id=doc.get("id", ""),
-                filename=doc.get("filename", "unknown"),
-                status=doc.get("status", "unknown"),
-                chunks=doc.get("chunks", 0),
-                collection=doc.get("collection", "default"),
-                file_size=doc.get("file_size", 0),
-                created_at=doc.get("created_at", ""),
-                processing_phase=doc.get("processing_phase"),
-                content_hash=doc.get("content_hash"),
-            )
-        )
+    # B12: Apply pagination after fetch (Redis SCAN doesn't support offset natively)
+    total = len(documents)
+    paginated = documents[offset : offset + limit]
 
-    return DocumentListResponse(documents=doc_responses, total=len(doc_responses))
+    doc_responses = [
+        DocumentResponse(
+            id=doc.get("id", ""),
+            filename=doc.get("filename", "unknown"),
+            status=doc.get("status", "unknown"),
+            chunks=doc.get("chunks", 0),
+            collection=doc.get("collection", "default"),
+            file_size=doc.get("file_size", 0),
+            created_at=doc.get("created_at", ""),
+            processing_phase=doc.get("processing_phase"),
+            content_hash=doc.get("content_hash"),
+        )
+        for doc in paginated
+    ]
+
+    return DocumentListResponse(documents=doc_responses, total=total)
 
 
 @router.get("/documents/{doc_id}", response_model=DocumentDetail)

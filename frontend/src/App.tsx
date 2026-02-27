@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import ErrorBoundary from '@/components/shared/ErrorBoundary';
 import Header from '@/components/layout/Header';
 import AnimatedBG from '@/components/layout/AnimatedBG';
 import StrategiesPage from '@/pages/StrategiesPage';
@@ -47,17 +48,19 @@ function AppShell() {
       <AnimatedBG />
       <Header />
       <main className="max-w-[1400px] mx-auto px-8 py-7 relative z-10">
-        <Routes>
-          <Route path="/strategies" element={<StrategiesPage />} />
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/documents" element={<DocumentsPage />} />
-          <Route path="/debugger" element={<DebuggerPage />} />
-          <Route path="/debugger/:traceId" element={<DebuggerPage />} />
-          <Route path="/compare" element={<ComparePage />} />
-          <Route path="/graph" element={<GraphPage />} />
-          <Route path="/quality" element={<QualityPage />} />
-          <Route path="*" element={<Navigate to="/strategies" replace />} />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/strategies" element={<StrategiesPage />} />
+            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/documents" element={<DocumentsPage />} />
+            <Route path="/debugger" element={<DebuggerPage />} />
+            <Route path="/debugger/:traceId" element={<DebuggerPage />} />
+            <Route path="/compare" element={<ComparePage />} />
+            <Route path="/graph" element={<GraphPage />} />
+            <Route path="/quality" element={<QualityPage />} />
+            <Route path="*" element={<Navigate to="/strategies" replace />} />
+          </Routes>
+        </ErrorBoundary>
       </main>
       <AdvisorChatbot />
     </div>

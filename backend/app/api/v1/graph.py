@@ -2,9 +2,12 @@
 Knowledge Graph Explorer endpoint.
 """
 
+import logging
 from typing import Optional
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
+
+logger = logging.getLogger("serpent.api.graph")
 
 router = APIRouter(tags=["graph"])
 
@@ -14,8 +17,8 @@ async def explore_graph(
     req: Request,
     collection: str = "default",
     entity: Optional[str] = None,
-    depth: int = 2,
-    limit: int = 100,
+    depth: int = Query(2, ge=1, le=5, description="Max traversal depth"),
+    limit: int = Query(100, ge=1, le=500, description="Max nodes to return"),
 ):
     """Get graph data for the Knowledge Graph Explorer UI."""
     graph_store = req.app.state.graph_store
@@ -28,5 +31,6 @@ async def explore_graph(
             limit=limit,
         )
         return subgraph
-    except Exception:
+    except Exception as exc:
+        logger.warning("Graph explore failed", extra={"error": str(exc)})
         return {"nodes": [], "edges": []}

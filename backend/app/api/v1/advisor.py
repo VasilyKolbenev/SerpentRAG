@@ -10,9 +10,11 @@ import uuid
 from typing import Optional
 
 import litellm
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
+from app.config import settings
+from app.dependencies import require_auth_in_production
 from app.schemas.query import RAGStrategy
 
 logger = logging.getLogger("serpent.advisor")
@@ -76,15 +78,20 @@ class AdvisorChatResponse(BaseModel):
 
 
 @router.post("/advisor/chat", response_model=AdvisorChatResponse)
-async def advisor_chat(request: AdvisorChatRequest, req: Request):
+async def advisor_chat(
+    request: AdvisorChatRequest,
+    req: Request,
+    current_user: Optional[dict] = Depends(require_auth_in_production),
+):
     """Conversational AI advisor for strategy selection."""
     app = req.app
     cache = app.state.cache
     llm = app.state.llm_service
 
-    # Load or create session
+    # A4: Scope session by user_id to prevent session hijacking
+    user_id = current_user["sub"] if current_user and current_user.get("sub") else "anonymous"
     session_id = request.session_id or str(uuid.uuid4())
-    history = await cache.get_advisor_session(session_id) or []
+    history = await cache.get_advisor_session(user_id, session_id) or []
 
     # Build messages with system prompt
     messages = [{"role": "system", "content": ADVISOR_SYSTEM_PROMPT}]
@@ -94,7 +101,7 @@ async def advisor_chat(request: AdvisorChatRequest, req: Request):
     # Call LLM (using lightweight model for cost efficiency)
     try:
         response = await litellm.acompletion(
-            model="anthropic/claude-3-haiku-20240307",
+            model=settings.advisor_model,
             messages=messages,
             temperature=0.7,
             max_tokens=1024,
@@ -111,7 +118,7 @@ async def advisor_chat(request: AdvisorChatRequest, req: Request):
     # Update history
     history.append({"role": "user", "content": request.message})
     history.append({"role": "assistant", "content": reply})
-    await cache.set_advisor_session(session_id, history, ttl=3600)
+    await cache.set_advisor_session(user_id, session_id, history, ttl=3600)
 
     # Try to extract recommendation from reply
     recommendation = _extract_recommendation(reply)

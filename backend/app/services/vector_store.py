@@ -187,6 +187,36 @@ class QdrantService:
             "status": info.status.value,
         }
 
+    async def scroll(
+        self,
+        collection_name: str,
+        limit: int = 100,
+        with_payload: bool = True,
+    ) -> list[SearchResult]:
+        """Scroll through collection points without a query vector.
+
+        Used by MemoRAG to sample collection chunks for memory building.
+        """
+        results, _ = await self._client.scroll(
+            collection_name=collection_name,
+            limit=limit,
+            with_payload=with_payload,
+            with_vectors=False,
+        )
+        return [
+            SearchResult(
+                id=str(r.id),
+                content=r.payload.get("content", "") if r.payload else "",
+                score=1.0,
+                metadata={
+                    k: v
+                    for k, v in (r.payload or {}).items()
+                    if k != "content"
+                },
+            )
+            for r in results
+        ]
+
     async def health_check(self) -> bool:
         """Check Qdrant connectivity."""
         try:

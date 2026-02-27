@@ -183,8 +183,12 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'serpent-app-session',
-      // Only persist sessionId to localStorage (messages are ephemeral)
-      partialize: (state) => ({ sessionId: state.sessionId }),
+      // C36: Persist sessionId + recent messages (with size guard)
+      partialize: (state) => ({
+        sessionId: state.sessionId,
+        messages: state.messages.slice(-50), // Keep last 50 messages max
+        selectedStrategy: state.selectedStrategy,
+      }),
     },
   ),
 );

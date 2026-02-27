@@ -14,15 +14,22 @@ interface ChatInputProps {
 export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const pendingRef = useRef(false);
   const selectedStrategy = useAppStore((s) => s.selectedStrategy);
   const meta = STRATEGY_MAP[selectedStrategy];
 
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
-    if (!trimmed || disabled) return;
+    // B13: Guard against double submit via rapid clicks/Enter
+    if (!trimmed || disabled || pendingRef.current) return;
+    pendingRef.current = true;
     onSend(trimmed);
     setValue('');
     inputRef.current?.focus();
+    // Reset guard after microtask (allows React to update disabled prop)
+    requestAnimationFrame(() => {
+      pendingRef.current = false;
+    });
   }, [value, disabled, onSend]);
 
   return (
@@ -43,6 +50,8 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
         placeholder="Ask the Serpent anything..."
         disabled={disabled}
+        maxLength={5000}
+        aria-label="Query input"
         className="flex-1 px-[13px] py-[9px] text-[12.5px] bg-serpent-bg border border-serpent-border rounded-[7px] text-serpent-text-secondary font-dm-sans placeholder:text-serpent-text-dark disabled:opacity-50"
       />
 

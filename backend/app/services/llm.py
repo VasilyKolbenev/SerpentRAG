@@ -23,6 +23,9 @@ if settings.anthropic_api_key:
     litellm.anthropic_key = settings.anthropic_api_key
 
 
+_LLM_TIMEOUT = 60  # D44: timeout for all LLM calls (seconds)
+
+
 class LLMService:
     """Unified LLM interface supporting multiple providers."""
 
@@ -88,6 +91,7 @@ class LLMService:
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
                 max_tokens=256,
+                timeout=_LLM_TIMEOUT,
             )
             rewritten = (response.choices[0].message.content or "").strip()
             if rewritten:
@@ -120,6 +124,7 @@ class LLMService:
                 messages=prompt,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                timeout=_LLM_TIMEOUT,
             )
             return response.choices[0].message.content or ""
         except Exception as e:
@@ -146,6 +151,7 @@ class LLMService:
                 temperature=temperature,
                 max_tokens=max_tokens,
                 stream=True,
+                timeout=_LLM_TIMEOUT,
             )
 
             async for chunk in response:
@@ -172,6 +178,7 @@ class LLMService:
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
                 max_tokens=4096,
+                timeout=_LLM_TIMEOUT,
             )
             return response.choices[0].message.content or ""
         except Exception as e:
@@ -219,20 +226,17 @@ class LLMService:
 
     def _resolve_model(self, model: str) -> str:
         """Resolve model name to LiteLLM-compatible format."""
-        # Ollama models need prefix
-        if model.startswith("ollama/") or model.startswith("ollama_chat/"):
+        # Already has a provider prefix — pass through
+        if "/" in model:
             return model
 
-        # Check if it's a known provider model
-        known_openai = {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"}
-        known_anthropic = {"claude-3-haiku-20240307", "claude-3-sonnet-20240229",
-                           "claude-3-opus-20240229", "claude-3-5-sonnet-20241022",
-                           "claude-3-5-haiku-20241022"}
-
-        if model in known_openai:
-            return model
-        if model in known_anthropic:
+        # Anthropic models: any name starting with "claude-"
+        if model.startswith("claude-"):
             return f"anthropic/{model}"
+
+        # OpenAI models: pass through (LiteLLM default)
+        if model.startswith(("gpt-", "o1-", "o3-")):
+            return model
 
         # If Ollama URL is set and model isn't recognized, try Ollama
         if settings.ollama_base_url and not settings.openai_api_key:

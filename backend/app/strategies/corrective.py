@@ -36,15 +36,6 @@ Return ONLY a JSON array of objects with "index", "score", and "reasoning" field
 
 Grades:"""
 
-QUERY_REWRITE_PROMPT = """Rewrite the following query to be more specific and effective for web
-search. Keep it concise (under 50 words).
-
-Original query: {query}
-
-Context about what we're looking for: {context}
-
-Rewritten query:"""
-
 GRADING_BATCH_SIZE = 5
 
 

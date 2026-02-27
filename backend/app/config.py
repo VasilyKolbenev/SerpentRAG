@@ -3,6 +3,7 @@ SERPENT RAG PLATFORM — Configuration
 Uses pydantic-settings for type-safe environment variable loading.
 """
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +13,16 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> "Settings":
+        """Prevent boot with insecure defaults in production."""
+        if self.is_production:
+            if self.jwt_secret == "change-me-in-production" or len(self.jwt_secret) < 32:
+                raise ValueError(
+                    "JWT_SECRET must be set to a strong secret (>= 32 chars) in production"
+                )
+        return self
 
     # Database
     database_url: str = "postgresql+asyncpg://serpent:serpent@localhost:5432/serpent"
@@ -52,6 +63,18 @@ class Settings(BaseSettings):
     # Web Search (CRAG)
     web_search_api_key: str = ""
     web_search_provider: str = "tavily"  # tavily | serpapi
+
+    # RAG Defaults (C19: extracted magic numbers)
+    default_top_k: int = 10
+    default_temperature: float = 0.1
+    default_model: str = "gpt-4o"
+    advisor_model: str = "anthropic/claude-3-haiku-20240307"
+    sufficiency_threshold: float = 0.7
+    relevance_threshold: float = 0.7
+    max_chat_history_messages: int = 20
+    memo_memory_ttl: int = 86400  # 24h
+    advisor_session_ttl: int = 3600  # 1h
+    chat_session_ttl: int = 14400  # 4h
 
     # Multi-Tenancy
     multi_tenancy_enabled: bool = False

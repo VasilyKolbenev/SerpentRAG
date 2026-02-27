@@ -5,11 +5,17 @@ Tests for DocumentProcessorService — parse, chunk, embed+store pipeline.
 import json
 import os
 import tempfile
+import uuid
 from unittest.mock import AsyncMock
 
 import pytest
 
 from app.services.document_processor import DocumentProcessorService
+
+# Stable UUIDs for tests (uuid5 needs a valid UUID as document_id)
+TEST_DOC_ID = str(uuid.uuid4())
+EMPTY_DOC_ID = str(uuid.uuid4())
+META_DOC_ID = str(uuid.uuid4())
 
 
 @pytest.fixture
@@ -66,7 +72,7 @@ class TestDocumentProcessorPipeline:
             mock_embedding_service.embed.return_value = [[0.1] * 1024] * 50
             chunk_count = await doc_processor.process_file(
                 file_path=path,
-                document_id="test-doc-1",
+                document_id=TEST_DOC_ID,
                 collection="test",
             )
             assert chunk_count > 0
@@ -82,7 +88,7 @@ class TestDocumentProcessorPipeline:
             with pytest.raises(ValueError, match="No text extracted"):
                 await doc_processor.process_file(
                     file_path=path,
-                    document_id="empty-doc",
+                    document_id=EMPTY_DOC_ID,
                     collection="test",
                 )
         finally:
@@ -97,7 +103,7 @@ class TestDocumentProcessorPipeline:
             mock_embedding_service.embed.return_value = [[0.1] * 1024] * 20
             await doc_processor.process_file(
                 file_path=path,
-                document_id="meta-doc",
+                document_id=META_DOC_ID,
                 collection="test",
                 metadata={"author": "test"},
             )

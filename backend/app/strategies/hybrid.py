@@ -4,6 +4,7 @@ Pipeline: Query → [Dense Vector + BM25 Sparse] → RRF Fusion → Cross-Encode
 """
 
 import logging
+import re
 from typing import Optional
 
 from rank_bm25 import BM25Okapi
@@ -100,9 +101,9 @@ class HybridRAGStrategy(BaseRAGStrategy):
         if not documents:
             return []
 
-        tokenized_docs = [doc.lower().split() for doc in documents]
+        tokenized_docs = [re.findall(r'\b\w+\b', doc.lower()) for doc in documents]
         bm25 = BM25Okapi(tokenized_docs)
-        tokenized_query = query.lower().split()
+        tokenized_query = re.findall(r'\b\w+\b', query.lower())
         scores = bm25.get_scores(tokenized_query)
 
         # Pair documents with scores and sort

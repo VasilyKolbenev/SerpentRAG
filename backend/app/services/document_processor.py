@@ -275,7 +275,10 @@ class DocumentProcessorService:
                 ]
                 return {"entities": valid_entities, "relationships": valid_rels}
         except json.JSONDecodeError:
-            logger.debug("Failed to parse entity extraction JSON", extra={"raw": text[:200]})
+            logger.warning(
+                "Failed to parse entity extraction JSON",
+                extra={"raw_preview": text[:200]},
+            )
         return None
 
     async def _parse_file(self, file_path: str) -> str:

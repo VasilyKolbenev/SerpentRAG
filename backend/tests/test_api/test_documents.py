@@ -19,7 +19,7 @@ class TestDocumentUpload:
         )
         assert response.status_code == 400
 
-    async def test_upload_valid_text_file(self, client: AsyncClient):
+    async def test_upload_valid_text_file(self, client: AsyncClient, app):
         # The endpoint does: from app.workers.tasks.ingest import process_document_task
         # We need to make that import resolve to a mock
         mock_task = MagicMock()
@@ -35,8 +35,13 @@ class TestDocumentUpload:
         fake_ingest = MagicMock()
         fake_ingest.process_document_task = mock_task
 
+        # Ensure dedup check returns None (new file) and atomic set succeeds
+        app.state.cache.get_file_hash.return_value = None
+        app.state.cache.set_file_hash.return_value = True
+
         with (
             patch("app.api.v1.documents.os.makedirs"),
+            patch("app.api.v1.documents.os.path.realpath", side_effect=lambda p: p),
             patch("app.api.v1.documents.aiofiles.open", return_value=mock_ctx),
             patch.dict(sys.modules, {"app.workers.tasks.ingest": fake_ingest}),
         ):
@@ -46,11 +51,15 @@ class TestDocumentUpload:
                 data={"collection": "test"},
             )
 
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
         assert "id" in data
         assert data["filename"] == "test.txt"
         assert data["status"] == "processing"
+
+        # Restore mock defaults
+        app.state.cache.get_file_hash.return_value = None
+        app.state.cache.set_file_hash.return_value = True
 
 
 class TestDocumentGet:

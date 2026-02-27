@@ -136,11 +136,9 @@ class MemoRAGStrategy(BaseRAGStrategy):
             input_summary=f"collection={collection}, model={model}",
         )
 
-        # Fetch representative chunks from vector store
-        dummy_vector = [0.0] * self.embedding.dimensions
-        all_results = await self.vector_store.search(
+        # C32: Use scroll API instead of zero-vector search hack
+        all_results = await self.vector_store.scroll(
             collection_name=collection,
-            query_vector=dummy_vector,
             limit=MEMORY_SUMMARY_MAX_CHUNKS,
         )
 

@@ -3,7 +3,7 @@
  * Killer Feature #4.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   BarChart,
   Bar,
@@ -45,46 +45,53 @@ export default function QualityDashboard() {
   >({});
   const [loading, setLoading] = useState(false);
 
-  // Fetch metrics for selected strategy
-  const fetchMetrics = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.getQualityMetrics({
-        strategy: selectedStrategy,
-        period: selectedPeriod,
-      });
-      setMetrics(data);
-    } catch {
-      setMetrics(null);
-    } finally {
-      setLoading(false);
-    }
+  // C24: Fetch with isMounted guard to prevent stale state updates
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchMetrics = async () => {
+      setLoading(true);
+      try {
+        const data = await api.getQualityMetrics({
+          strategy: selectedStrategy,
+          period: selectedPeriod,
+        });
+        if (!cancelled) setMetrics(data);
+      } catch {
+        if (!cancelled) setMetrics(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchMetrics();
+    return () => { cancelled = true; };
   }, [selectedStrategy, selectedPeriod]);
 
   // Fetch all strategies for comparison chart
-  const fetchAllMetrics = useCallback(async () => {
-    const results: Record<string, QualityMetrics> = {};
-    for (const s of STRATEGIES) {
-      try {
-        const data = await api.getQualityMetrics({
-          strategy: s.id,
-          period: selectedPeriod,
-        });
-        results[s.id] = data;
-      } catch {
-        // Skip unavailable strategies
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchAllMetrics = async () => {
+      const results: Record<string, QualityMetrics> = {};
+      for (const s of STRATEGIES) {
+        if (cancelled) break;
+        try {
+          const data = await api.getQualityMetrics({
+            strategy: s.id,
+            period: selectedPeriod,
+          });
+          results[s.id] = data;
+        } catch {
+          // Skip unavailable strategies
+        }
       }
-    }
-    setAllMetrics(results);
-  }, [selectedPeriod]);
+      if (!cancelled) setAllMetrics(results);
+    };
 
-  useEffect(() => {
-    fetchMetrics();
-  }, [fetchMetrics]);
-
-  useEffect(() => {
     fetchAllMetrics();
-  }, [fetchAllMetrics]);
+    return () => { cancelled = true; };
+  }, [selectedPeriod]);
 
   // Build chart data
   const chartData = Object.keys(METRIC_COLORS).map((metric) => {

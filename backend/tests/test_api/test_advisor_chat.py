@@ -66,8 +66,8 @@ class TestAdvisorChat:
         assert response.status_code == 200
         data = response.json()
         assert data["session_id"] == "test-session-123"
-        # Cache was checked for existing session
-        mock_cache_service.get_advisor_session.assert_called_with("test-session-123")
+        # Cache was checked for existing session (now scoped by user_id)
+        mock_cache_service.get_advisor_session.assert_called_with("anonymous", "test-session-123")
         # Session was saved after response
         mock_cache_service.set_advisor_session.assert_called_once()
 

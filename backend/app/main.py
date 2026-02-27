@@ -13,6 +13,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import settings
 from app.middleware.logging import RequestLoggingMiddleware, setup_logging
+from app.middleware.rate_limit import RateLimitMiddleware
 
 logger = logging.getLogger("serpent")
 
@@ -105,6 +106,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         max_age=3600,
     )
+
+    # Rate limiting (before logging so rejected requests are also logged)
+    app.add_middleware(RateLimitMiddleware)
 
     # Request logging
     app.add_middleware(RequestLoggingMiddleware)

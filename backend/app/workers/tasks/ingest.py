@@ -2,9 +2,15 @@
 Document ingestion Celery tasks.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 import redis
 
@@ -110,7 +116,7 @@ async def _async_process(
     file_path: str,
     collection: str,
     filename: str,
-    phase_callback: object = None,
+    phase_callback: "Callable[[str], None] | None" = None,
 ) -> int:
     """Async document processing logic."""
     from app.services.document_processor import DocumentProcessorService

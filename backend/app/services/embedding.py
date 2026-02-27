@@ -3,6 +3,7 @@ Embedding service — unified interface for local and cloud embedding models.
 Supports: sentence-transformers (BGE-M3), OpenAI (text-embedding-3-small).
 """
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -73,7 +74,9 @@ class EmbeddingService:
         all_embeddings: list[list[float]] = []
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
-            embeddings = self._model.encode(
+            # B8: Run CPU-blocking encode in thread pool to avoid blocking event loop
+            embeddings = await asyncio.to_thread(
+                self._model.encode,
                 batch,
                 normalize_embeddings=True,
                 show_progress_bar=False,

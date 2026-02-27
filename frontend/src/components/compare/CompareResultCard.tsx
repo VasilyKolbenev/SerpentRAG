@@ -7,7 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import SourceChip from '@/components/chat/SourceChip';
 import { STRATEGY_MAP } from '@/lib/constants';
 import { withAlpha, formatDuration } from '@/lib/utils';
-import type { CompareResult, RAGStrategy } from '@/types/api';
+import type { CompareResult } from '@/types/api';
 
 interface CompareResultCardProps {
   result: CompareResult;

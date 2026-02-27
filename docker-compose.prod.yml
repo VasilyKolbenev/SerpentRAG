@@ -10,8 +10,8 @@ x-common: &common
   logging:
     driver: json-file
     options:
-      max-size: "10m"
-      max-file: "3"
+      max-size: "50m"
+      max-file: "5"
   security_opt:
     - no-new-privileges:true
   read_only: true
@@ -57,6 +57,11 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
 
   # ── Frontend (React) ───────────────────────────────
   frontend:
@@ -81,8 +86,7 @@ services:
       - "traefik.http.routers.frontend.middlewares=frontend-headers,rate-limit"
       - "traefik.http.middlewares.rate-limit.ratelimit.average=100"
       - "traefik.http.middlewares.rate-limit.ratelimit.burst=50"
-    ports:
-      - "3000:3000"
+    # B14: No direct port exposure — traffic flows through Traefik only
     networks:
       - serpent-public
       - serpent-internal
@@ -179,8 +183,12 @@ services:
       - TRANSFORMERS_OFFLINE=1
       - HF_HUB_OFFLINE=1
     depends_on:
-      - api
-      - redis
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
     volumes:
       - upload-data:/app/uploads
       - model-cache:/app/models

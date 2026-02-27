@@ -65,6 +65,7 @@ def mock_llm_service() -> AsyncMock:
     """Mock LLMService — returns fixed answers."""
     svc = AsyncMock(spec=LLMService)
     svc.generate.return_value = "Test answer based on context."
+    svc.rewrite_query.return_value = "rewritten test query"
 
     async def _stream_gen(*args, **kwargs):
         for token in ["Test ", "answer ", "based ", "on ", "context."]:
@@ -154,6 +155,18 @@ def mock_cache_service() -> AsyncMock:
     # Advisor
     svc.get_advisor_session.return_value = None
     svc.set_advisor_session.return_value = None
+    # Chat sessions
+    svc.get_chat_session.return_value = None
+    svc.set_chat_session.return_value = None
+    svc.delete_chat_session.return_value = True
+    svc.list_chat_sessions.return_value = []
+    # File hash dedup
+    svc.get_file_hash.return_value = None
+    svc.set_file_hash.return_value = True
+    svc.delete_file_hash.return_value = None
+    # Document status
+    svc.list_doc_statuses.return_value = []
+    svc.delete_doc_status.return_value = True
     svc.health_check.return_value = True
     return svc
 

@@ -90,9 +90,9 @@ export function AdvisorChatbot() {
               </div>
             )}
 
-            {messages.map((msg, i) => (
+            {messages.map((msg) => (
               <div
-                key={i}
+                key={msg.id}
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div

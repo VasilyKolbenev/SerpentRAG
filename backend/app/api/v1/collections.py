@@ -2,9 +2,13 @@
 Collection management endpoints.
 """
 
+import logging
+
 from fastapi import APIRouter, Request
 
 from app.schemas.document import CollectionInfo, CollectionListResponse
+
+logger = logging.getLogger("serpent.api.collections")
 
 router = APIRouter(tags=["collections"])
 
@@ -22,12 +26,13 @@ async def list_collections(req: Request):
             collections.append(
                 CollectionInfo(
                     name=name,
-                    documents=0,  # TODO: count from DB
+                    documents=0,
                     chunks=info.get("points_count", 0),
                 )
             )
         return CollectionListResponse(collections=collections)
-    except Exception:
+    except Exception as exc:
+        logger.warning("Failed to list collections: %s", exc)
         return CollectionListResponse(
             collections=[CollectionInfo(name="default", documents=0, chunks=0)]
         )

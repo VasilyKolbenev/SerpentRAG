@@ -7,9 +7,13 @@ import type { AdvisorRecommendation } from '@/types/api';
 import { api } from '@/lib/api';
 
 interface ChatMessage {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
 }
+
+let _nextId = 1;
+const advisorMsgId = () => `adv-${Date.now()}-${_nextId++}`;
 
 interface AdvisorState {
   isOpen: boolean;
@@ -38,7 +42,7 @@ export const useAdvisorStore = create<AdvisorState>((set, get) => ({
     const { sessionId, messages } = get();
 
     // Add user message immediately
-    const userMsg: ChatMessage = { role: 'user', content: text };
+    const userMsg: ChatMessage = { id: advisorMsgId(), role: 'user', content: text };
     set({ messages: [...messages, userMsg], isLoading: true, error: null });
 
     try {
@@ -48,6 +52,7 @@ export const useAdvisorStore = create<AdvisorState>((set, get) => ({
       });
 
       const assistantMsg: ChatMessage = {
+        id: advisorMsgId(),
         role: 'assistant',
         content: response.reply,
       };

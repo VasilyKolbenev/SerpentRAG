@@ -28,6 +28,7 @@ const BACKOFF_INITIAL_MS = 2000;
 const BACKOFF_MAX_MS = 30_000;
 const BACKOFF_MULTIPLIER = 2;
 const MAX_POLL_TIME_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB — matches backend max_upload_size
 
 export default function UploadZone() {
   const [dragging, setDragging] = useState(false);
@@ -67,6 +68,20 @@ export default function UploadZone() {
 
   const uploadFile = useCallback(
     async (file: File) => {
+      // C22: Client-side file size check
+      if (file.size > MAX_FILE_SIZE) {
+        const tempId = `temp-${Date.now()}-${file.name}`;
+        addUpload({
+          id: tempId,
+          name: file.name,
+          size: file.size,
+          status: 'failed',
+          error: `File too large (max ${MAX_FILE_SIZE / 1024 / 1024}MB)`,
+          collection: activeCollection,
+        });
+        return;
+      }
+
       const tempId = `temp-${Date.now()}-${file.name}`;
 
       addUpload({
@@ -193,7 +208,16 @@ export default function UploadZone() {
 
       {/* Drop zone */}
       <div
+        role="button"
+        tabIndex={0}
+        aria-label="Upload documents — click or drag and drop files"
         onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
         onDragOver={(e) => {
           e.preventDefault();
           setDragging(true);

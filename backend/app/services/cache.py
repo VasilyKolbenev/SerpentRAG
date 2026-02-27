@@ -112,19 +112,21 @@ class RedisService:
 
     # ── Advisor Sessions ──
 
-    async def get_advisor_session(self, session_id: str) -> Optional[list[dict]]:
-        """Get advisor chatbot conversation history."""
-        key = f"serpent:advisor:{session_id}"
+    async def get_advisor_session(
+        self, user_id: str, session_id: str
+    ) -> Optional[list[dict]]:
+        """Get advisor chatbot conversation history (scoped by user)."""
+        key = f"serpent:advisor:{user_id}:{session_id}"
         data = await self._client.get(key)
         if data:
             return json.loads(data)
         return None
 
     async def set_advisor_session(
-        self, session_id: str, history: list[dict], ttl: int = 3600
+        self, user_id: str, session_id: str, history: list[dict], ttl: int = 3600
     ) -> None:
-        """Save advisor chatbot conversation history (1h TTL)."""
-        key = f"serpent:advisor:{session_id}"
+        """Save advisor chatbot conversation history (1h TTL, scoped by user)."""
+        key = f"serpent:advisor:{user_id}:{session_id}"
         await self._client.setex(key, ttl, json.dumps(history))
 
     # ── Chat Sessions ──
@@ -178,10 +180,18 @@ class RedisService:
 
     async def set_file_hash(
         self, collection: str, file_hash: str, doc_id: str, ttl: int = 86400
-    ) -> None:
-        """Store file content hash → doc_id mapping (24h TTL)."""
+    ) -> bool:
+        """Store file content hash → doc_id mapping (24h TTL).
+
+        Uses SET NX (atomic set-if-not-exists) to prevent race conditions
+        when two concurrent uploads have the same content hash.
+
+        Returns:
+            True if set (new hash), False if already existed (concurrent upload).
+        """
         key = f"serpent:file_hash:{collection}:{file_hash}"
-        await self._client.setex(key, ttl, doc_id)
+        result = await self._client.set(key, doc_id, ex=ttl, nx=True)
+        return result is not None
 
     async def delete_file_hash(self, collection: str, file_hash: str) -> None:
         """Remove file hash mapping (called on document deletion)."""

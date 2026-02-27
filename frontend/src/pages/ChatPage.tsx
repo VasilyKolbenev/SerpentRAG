@@ -100,11 +100,8 @@ export default function ChatPage() {
 
   return (
     <div
-      className="grid gap-4 animate-fade-slide-up"
-      style={{
-        gridTemplateColumns: '1fr 300px',
-        height: 'calc(100vh - 130px)',
-      }}
+      className="grid gap-4 animate-fade-slide-up grid-cols-1 lg:grid-cols-[1fr_300px]"
+      style={{ height: 'calc(100vh - 130px)' }}
     >
       {/* Main chat area */}
       <ChatPanel
@@ -114,8 +111,8 @@ export default function ChatPage() {
         isStreaming={isStreaming}
       />
 
-      {/* Sidebar */}
-      <div className="flex flex-col gap-3 overflow-y-auto">
+      {/* Sidebar — hidden on mobile, visible on large screens */}
+      <div className="hidden lg:flex flex-col gap-3 overflow-y-auto">
         {/* New Chat button */}
         <button
           onClick={clearSession}
